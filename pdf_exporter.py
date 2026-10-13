@@ -1,6 +1,6 @@
 """
-Módulo para exportar análisis de supervivencia a PDF
-Soporta Kaplan-Meier, Cox Regression, Log-Rank Test y Weibull
+Module for exporting survival analyses to PDF.
+Support Kaplan-Meier, Cox regression, Log-Rank, and Weibull.
 """
 
 import io
@@ -18,7 +18,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 import plotly.graph_objects as go
 import plotly.io as pio
-from translations import get_translation
+from translations import get_translation, get_display_text
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -27,13 +27,13 @@ LOGO_RIGHT_PATH = BASE_DIR / "assets" / "logo_espc.png"
 
 
 class SurvivalAnalysisPDFExporter:
-    """Clase para generar informes PDF de análisis de supervivencia"""
+    """Generate survival analysis PDF reports."""
     
-    def __init__(self, filename, language='es', has_graph=False, report_name=None, header_datetime=None):
-        """Inicializa la configuracion del exportador y prepara la lista de elementos PDF."""
+    def __init__(self, filename, language='en', has_graph=False, report_name=None, header_datetime=None):
+        """Initialize exporter settings and prepare the list of PDF elements."""
         self.filename = filename
         self.language = language
-        self.has_graph = has_graph  # Para saber si necesitamos landscape
+        self.has_graph = has_graph  # Track whether landscape orientation is needed.
         self.report_name = (report_name or Path(filename).stem).strip()
         self.header_datetime = header_datetime or datetime.now()
         self.styles = getSampleStyleSheet()
@@ -41,8 +41,8 @@ class SurvivalAnalysisPDFExporter:
         self.elements = []
         
     def _setup_custom_styles(self):
-        """Configura estilos personalizados para el PDF con Times New Roman"""
-        # Título personalizado
+        """Configure custom PDF styles using Times New Roman."""
+        # Custom title.
         self.styles.add(ParagraphStyle(
             name='CustomTitle',
             parent=self.styles['Heading1'],
@@ -55,7 +55,7 @@ class SurvivalAnalysisPDFExporter:
             leading=28
         ))
         
-        # Subtítulo
+        # Subtitle.
         self.styles.add(ParagraphStyle(
             name='Subtitle',
             parent=self.styles['Normal'],
@@ -68,7 +68,7 @@ class SurvivalAnalysisPDFExporter:
             leading=16
         ))
         
-        # Título de sección - Centrado y Negrita
+        # Centered, bold section title.
         self.styles.add(ParagraphStyle(
             name='SectionTitle',
             parent=self.styles['Heading2'],
@@ -82,7 +82,7 @@ class SurvivalAnalysisPDFExporter:
             leading=16
         ))
         
-        # Texto normal con sangrías y espaciado
+        # Body text with indentation and spacing.
         self.styles.add(ParagraphStyle(
             name='NormalText',
             parent=self.styles['Normal'],
@@ -91,13 +91,13 @@ class SurvivalAnalysisPDFExporter:
             spaceBefore=6,
             fontName='Times-Roman',
             alignment=4,  # Justified
-            leading=16,  # Espaciado entre líneas
-            firstLineIndent=18,  # Sangría de 0.25 pulgadas
+            leading=16,  # Line spacing.
+            firstLineIndent=18,  # 0.25-inch indentation.
             leftIndent=18,
             rightIndent=18
         ))
         
-        # Texto de interpretación/conclusión con párrafos bien formateados
+        # Interpretation/conclusion text with formatted paragraphs.
         self.styles.add(ParagraphStyle(
             name='InterpretationText',
             parent=self.styles['Normal'],
@@ -106,10 +106,10 @@ class SurvivalAnalysisPDFExporter:
             spaceBefore=0,
             fontName='Times-Roman',
             alignment=4,  # Justified
-            leading=17,  # Espaciado generoso entre líneas
-            firstLineIndent=18,  # Sangría de primera línea
-            leftIndent=18,  # Margen izquierdo
-            rightIndent=18  # Margen derecho
+            leading=17,  # Generous line spacing.
+            firstLineIndent=18,  # First-line indentation.
+            leftIndent=18,  # Left margin.
+            rightIndent=18  # Right margin.
         ))
 
         self.styles.add(ParagraphStyle(
@@ -151,7 +151,7 @@ class SurvivalAnalysisPDFExporter:
             rightIndent=18
         ))
         
-        # Texto de descripción/introducción de análisis
+        # Analysis description/introduction text.
         self.styles.add(ParagraphStyle(
             name='DescriptionText',
             parent=self.styles['Normal'],
@@ -184,15 +184,15 @@ class SurvivalAnalysisPDFExporter:
         ))
 
     def _is_english(self):
-        """Indica si el informe debe generarse en ingles."""
+        """Check whether the report should be generated in English."""
         return self.language == 'en'
 
     def _format_header_datetime(self):
-        """Formatea fecha y hora para la cabecera superior."""
+        """Format the date and time for the top header."""
         return self.header_datetime.strftime('%d/%m/%Y %H:%M')
     
     def _add_header(self, title, subtitle=""):
-        """Agrega portada/header al documento"""
+        """Add the cover/header to the document."""
         self.elements.append(Spacer(1, 0.5*inch))
         
         title_para = Paragraph(title, self.styles['CustomTitle'])
@@ -205,7 +205,7 @@ class SurvivalAnalysisPDFExporter:
         self.elements.append(Spacer(1, 0.3*inch))
 
     def _add_paragraph_block(self, text, style_name='InterpretationText'):
-        """Agrega un bloque de texto respetando párrafos y saltos internos."""
+        """Add a text block preserving paragraphs and internal line breaks."""
         if not text:
             return
 
@@ -219,11 +219,11 @@ class SurvivalAnalysisPDFExporter:
         )
 
         def _clean_text(value):
-            """Normaliza texto para comparar encabezados internos sin simbolos."""
+            """Normalize text for comparing internal headings without symbols."""
             return re.sub(r'[^a-z0-9 ]+', '', value.lower()).strip()
 
         def _looks_like_subheading(value):
-            """Detecta si un parrafo debe mostrarse como subtitulo dentro del PDF."""
+            """Detect whether a paragraph should be displayed as a PDF subheading."""
             cleaned = _clean_text(value)
             if not cleaned:
                 return False
@@ -259,8 +259,8 @@ class SurvivalAnalysisPDFExporter:
                     self.elements.append(Spacer(1, 0.04 * inch))
     
     def _add_section_title(self, title):
-        """Agrega título de sección"""
-        # Espacio fijo para separar visualmente el encabezado de página del título.
+        """Add a section title."""
+        # Fixed space to visually separate the page header from the title.
         self.elements.append(Spacer(1, 0.14 * inch))
         self.elements.append(Paragraph(title, self.styles['SectionTitle']))
         underline = Table([[""]], colWidths=[7.6 * inch])
@@ -275,7 +275,7 @@ class SurvivalAnalysisPDFExporter:
         self.elements.append(Spacer(1, 0.18*inch))
     
     def add_summary_section(self, n_patients, n_events, follow_up_mean, follow_up_median):
-        """Agrega sección de resumen general con estilo profesional y sin solapamiento"""
+        """Add a professionally styled general summary section without overlap."""
         self._add_section_title("1. SUMMARY" if self._is_english() else "1. RESUMEN GENERAL")
         
         summary_data = [
@@ -325,11 +325,11 @@ class SurvivalAnalysisPDFExporter:
         self.elements.append(Spacer(1, 0.3*inch))
     
     def add_kaplan_meier_section(self, variable_name="", survival_table_data=None):
-        """Agrega sección de Kaplan-Meier - 2. TABLA DE RESULTADOS"""
+        """Add the Kaplan-Meier section: 2. RESULTS TABLE."""
         subtitle = f" - {variable_name}" if variable_name else " - General"
         self._add_section_title(("2. RESULTS TABLE" if self._is_english() else "2. TABLA DE RESULTADOS") + subtitle)
         
-        # Descripción
+        # Description.
         intro_text = (
             "Kaplan-Meier analysis is a non-parametric statistical method that estimates the survival function from time-to-event data. This section presents descriptive survival statistics."
             if self._is_english() else
@@ -338,16 +338,16 @@ class SurvivalAnalysisPDFExporter:
         self.elements.append(Paragraph(intro_text, self.styles['DescriptionText']))
         self.elements.append(Spacer(1, 0.15*inch))
         
-        # Tabla de supervivencia si existe
+        # Survival table, if available.
         if survival_table_data is not None and isinstance(survival_table_data, pd.DataFrame) and len(survival_table_data) > 0:
             self.elements.append(Spacer(1, 0.1*inch))
             
-            # Convertir DataFrame a lista de listas para la tabla
-            table_data = [list(survival_table_data.columns)]
+            # Convert the DataFrame to a list of lists for the table.
+            table_data = [[get_display_text(self.language, column) for column in survival_table_data.columns]]
             for row in survival_table_data.values:
-                table_data.append([str(val) for val in row])
+                table_data.append([get_display_text(self.language, str(val)) for val in row])
             
-            # Calcular ancho de columnas dinámicamente
+            # Calculate column widths dynamically.
             num_cols = len(survival_table_data.columns)
             total_width = 8.2*inch
             col_widths = [total_width / num_cols] * num_cols
@@ -373,7 +373,7 @@ class SurvivalAnalysisPDFExporter:
 
             self.elements.append(table)
             self.elements.append(Spacer(1, 0.2*inch))
-            print(f"Tabla KM agregada: {len(table_data)} rows")
+            print(f"""KM table added: {len(table_data)} rows""")
         else:
             self.elements.append(Paragraph(
                 ("Survival Table<br/>" if self._is_english() else "Tabla de Supervivencia<br/>")
@@ -384,10 +384,10 @@ class SurvivalAnalysisPDFExporter:
         self.elements.append(Spacer(1, 0.3*inch))
     
     def add_cox_regression_section(self, coefficients_table=None):
-        """Agrega sección de Cox Regression - 2. TABLA DE RESULTADOS"""
+        """Add the Cox regression section: 2. RESULTS TABLE."""
         self._add_section_title("2. RESULTS TABLE" if self._is_english() else "2. TABLA DE RESULTADOS")
         
-        # Descripción
+        # Description.
         intro_text = (
             "Cox Regression is a semiparametric model used to assess the effect of multiple covariates on time-to-event. Model coefficients represent the change in log-hazard per unit change in the covariate. exp(coefficient) is the Hazard Ratio (HR), which interprets relative risk."
             if self._is_english() else
@@ -396,27 +396,27 @@ class SurvivalAnalysisPDFExporter:
         self.elements.append(Paragraph(intro_text, self.styles['DescriptionText']))
         self.elements.append(Spacer(1, 0.15*inch))
         
-        # Tabla de coeficientes
+        # Coefficient table.
         if coefficients_table is not None and isinstance(coefficients_table, pd.DataFrame) and len(coefficients_table) > 0:
             self.elements.append(Spacer(1, 0.1*inch))
             
-            # Convertir DataFrame a lista de listas para la tabla
-            table_data = [list(coefficients_table.columns)]
+            # Convert the DataFrame to a list of lists for the table.
+            table_data = [[get_display_text(self.language, column) for column in coefficients_table.columns]]
             for row in coefficients_table.values:
-                # Redondear números para que ocupen menor espacio
+                # Round numbers to take up less space.
                 row_str = []
                 for val in row:
                     if isinstance(val, float):
                         row_str.append(f"{val:.4f}")
                     else:
-                        row_str.append(str(val))
+                        row_str.append(get_display_text(self.language, str(val)))
                 table_data.append(row_str)
             
-            # Calcular ancho de columnas de forma inteligente
+            # Calculate suitable column widths.
             num_cols = len(coefficients_table.columns)
-            # Ancho total disponible
+            # Total available width.
             total_width = 8.2*inch
-            # Distribuir proporcionalmente - primera columna más ancha para nombres
+            # Distribute widths proportionally, widening the first column for names.
             col_widths = [2.5*inch] + [(total_width - 2.5*inch) / (num_cols - 1)] * (num_cols - 1) if num_cols > 1 else [total_width]
             
             table = Table(table_data, colWidths=col_widths)
@@ -441,7 +441,7 @@ class SurvivalAnalysisPDFExporter:
 
             self.elements.append(table)
             self.elements.append(Spacer(1, 0.2*inch))
-            print(f"Tabla Cox agregada: {len(table_data)} rows")
+            print(f"""Cox table added: {len(table_data)} rows""")
         else:
             self.elements.append(Paragraph(
                 ("Cox Model Coefficients<br/>" if self._is_english() else "Coeficientes del Modelo Cox<br/>")
@@ -452,10 +452,10 @@ class SurvivalAnalysisPDFExporter:
         self.elements.append(Spacer(1, 0.3*inch))
     
     def add_log_rank_section(self, test_results=None):
-        """Agrega sección de Log-Rank Test - 2. TABLA DE RESULTADOS"""
+        """Add the Log-Rank test section: 2. RESULTS TABLE."""
         self._add_section_title("2. RESULTS TABLE" if self._is_english() else "2. TABLA DE RESULTADOS")
         
-        # Descripción
+        # Description.
         intro_text = (
             "The Log-Rank Test is a non-parametric statistical test that compares survival curves between two or more groups. The null hypothesis states that there is no difference in survival functions between groups. A p-value < 0.05 indicates significant differences."
             if self._is_english() else
@@ -465,7 +465,7 @@ class SurvivalAnalysisPDFExporter:
         self.elements.append(Spacer(1, 0.15*inch))
         
         if test_results is not None:
-            # Si es dict
+            # Dictionary input.
             if isinstance(test_results, dict):
                 test_data = [
                     ["Statistic" if self._is_english() else "Estadístico", "Value" if self._is_english() else "Valor"],
@@ -495,9 +495,9 @@ class SurvivalAnalysisPDFExporter:
 
                 self.elements.append(table)
                 self.elements.append(Spacer(1, 0.2*inch))
-                print(f"Tabla Log-Rank agregada (dict)")
+                print(f"""Log-Rank table added (dict)""")
                 
-                # Interpretación
+                # Interpretation.
                 p_val = test_results.get('p_value', 1)
                 if p_val < 0.05:
                     interpretation = "There is a SIGNIFICANT difference between groups (p < 0.05). The null hypothesis is rejected."if self._is_english() else "Hay diferencia SIGNIFICATIVA entre grupos (p < 0.05). Se rechaza la hipótesis nula."
@@ -513,27 +513,27 @@ class SurvivalAnalysisPDFExporter:
                 )
                 self.elements.append(interp_para)
             
-            # Si es DataFrame
+            # DataFrame input.
             elif isinstance(test_results, pd.DataFrame) and len(test_results) > 0:
-                # Convertir DataFrame a lista de listas para la tabla
-                table_data = [list(test_results.columns)]
+                # Convert the DataFrame to a list of lists for the table.
+                table_data = [[get_display_text(self.language, column) for column in test_results.columns]]
                 for row in test_results.values:
-                    # Redondear números para ocupar menos espacio
+                    # Round numbers to take up less space.
                     row_str = []
                     for val in row:
                         if isinstance(val, float):
                             row_str.append(f"{val:.4f}")
                         else:
-                            row_str.append(str(val)[:15])  # Limitar a 15 caracteres
+                            row_str.append(get_display_text(self.language, str(val))[:16 if self._is_english() else 15])  # Keep the English H0 decision complete.
                     table_data.append(row_str)
                 
-                # Calcular ancho de columnas con mejor distribución
+                # Calculate column widths with improved distribution.
                 num_cols = len(test_results.columns)
                 total_width = 8.2*inch
-                # Primera columna más ancha para nombres de variables
+                # Widen the first column for variable names.
                 col_widths = [2.5*inch] + [(total_width - 2.5*inch) / (num_cols - 1)] * (num_cols - 1) if num_cols > 1 else [total_width]
                 
-                # Crear tabla
+                # Create the table.
                 table = Table(table_data, colWidths=col_widths, repeatRows=1)
                 table.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#27ae60')),
@@ -556,7 +556,7 @@ class SurvivalAnalysisPDFExporter:
 
                 self.elements.append(table)
                 self.elements.append(Spacer(1, 0.2*inch))
-                print(f"Tabla Log-Rank agregada: {len(table_data)} rows x {num_cols} cols")
+                print(f"""Log-Rank table added: {len(table_data)} rows x {num_cols} cols""")
         else:
             self.elements.append(Paragraph(
                 ("Log-Rank Test Results<br/>" if self._is_english() else "Resultados del Test de Log-Rank<br/>")
@@ -567,7 +567,7 @@ class SurvivalAnalysisPDFExporter:
         self.elements.append(Spacer(1, 0.3*inch))
 
     def add_weibull_section(self, weibull_table=None, section_title=None):
-        """Agrega sección de Weibull - 2. TABLA DE RESULTADOS"""
+        """Add the Weibull section: 2. RESULTS TABLE."""
         self._add_section_title(section_title or ("2. RESULTS TABLE" if self._is_english() else "2. TABLA DE RESULTADOS"))
 
         intro_text = (
@@ -581,14 +581,14 @@ class SurvivalAnalysisPDFExporter:
         if weibull_table is not None and isinstance(weibull_table, pd.DataFrame) and len(weibull_table) > 0:
             self.elements.append(Spacer(1, 0.1*inch))
 
-            table_data = [list(weibull_table.columns)]
+            table_data = [[get_display_text(self.language, column) for column in weibull_table.columns]]
             for row in weibull_table.values:
                 row_str = []
                 for val in row:
                     if isinstance(val, float):
                         row_str.append(f"{val:.4f}")
                     else:
-                        row_str.append(str(val))
+                        row_str.append(get_display_text(self.language, str(val)))
                 table_data.append(row_str)
 
             num_cols = len(weibull_table.columns)
@@ -617,7 +617,7 @@ class SurvivalAnalysisPDFExporter:
 
             self.elements.append(table)
             self.elements.append(Spacer(1, 0.2 * inch))
-            print(f"Tabla Weibull agregada: {len(table_data)} rows")
+            print(f"""Weibull table added: {len(table_data)} rows""")
         else:
             self.elements.append(Paragraph(
                 ("Weibull Fit Summary<br/>" if self._is_english() else "Resumen del Ajuste Weibull<br/>")
@@ -628,7 +628,7 @@ class SurvivalAnalysisPDFExporter:
         self.elements.append(Spacer(1, 0.3 * inch))
 
     def add_exponential_section(self, exponential_table=None, section_title=None):
-        """Agrega sección de Exponencial - 2. TABLA DE RESULTADOS"""
+        """Add the Exponential section: 2. RESULTS TABLE."""
         self._add_section_title(section_title or ("2. RESULTS TABLE" if self._is_english() else "2. TABLA DE RESULTADOS"))
 
         intro_text = (
@@ -643,21 +643,21 @@ class SurvivalAnalysisPDFExporter:
             self.elements.append(Spacer(1, 0.1 * inch))
 
             def _cell(value, header=False, left=False):
-                """Formatea una celda de tabla con el estilo adecuado."""
+                """Format a table cell with the appropriate style."""
                 style = self.styles['TableCellLeft'] if left else self.styles['TableCell']
                 text = str(value).replace("\n", "<br/>")
                 if header:
                     text = f"<b>{text}</b>"
                 return Paragraph(text, style)
 
-            table_data = [[_cell(column, header=True, left=index == 0) for index, column in enumerate(exponential_table.columns)]]
+            table_data = [[_cell(get_display_text(self.language, column), header=True, left=index == 0) for index, column in enumerate(exponential_table.columns)]]
             for row in exponential_table.values:
                 row_str = []
                 for index, val in enumerate(row):
                     if isinstance(val, float):
                         cell_value = f"{val:.4f}"
                     else:
-                        cell_value = str(val)
+                        cell_value = get_display_text(self.language, str(val))
                     row_str.append(_cell(cell_value, left=index == 0))
                 table_data.append(row_str)
 
@@ -693,7 +693,7 @@ class SurvivalAnalysisPDFExporter:
 
             self.elements.append(table)
             self.elements.append(Spacer(1, 0.2 * inch))
-            print(f"Tabla Exponencial agregada: {len(table_data)} rows")
+            print(f"""Exponential table added: {len(table_data)} rows""")
         else:
             self.elements.append(Paragraph(
                 ("Exponential Fit Summary<br/>" if self._is_english() else "Resumen del Ajuste Exponencial<br/>")
@@ -704,7 +704,7 @@ class SurvivalAnalysisPDFExporter:
         self.elements.append(Spacer(1, 0.3 * inch))
 
     def add_rsf_section(self, rsf_table=None):
-        """Agrega sección de Random Survival Forest - 2. TABLA DE RESULTADOS"""
+        """Add the Random Survival Forest section: 2. RESULTS TABLE."""
         self._add_section_title("2. RESULTS TABLE" if self._is_english() else "2. TABLA DE RESULTADOS")
 
         intro_text = (
@@ -718,14 +718,14 @@ class SurvivalAnalysisPDFExporter:
         if rsf_table is not None and isinstance(rsf_table, pd.DataFrame) and len(rsf_table) > 0:
             self.elements.append(Spacer(1, 0.1 * inch))
 
-            table_data = [list(rsf_table.columns)]
+            table_data = [[get_display_text(self.language, column) for column in rsf_table.columns]]
             for row in rsf_table.values:
                 row_str = []
                 for val in row:
                     if isinstance(val, float):
                         row_str.append(f"{val:.4f}")
                     else:
-                        row_str.append(str(val))
+                        row_str.append(get_display_text(self.language, str(val)))
                 table_data.append(row_str)
 
             num_cols = len(rsf_table.columns)
@@ -754,7 +754,7 @@ class SurvivalAnalysisPDFExporter:
 
             self.elements.append(table)
             self.elements.append(Spacer(1, 0.2 * inch))
-            print(f"Tabla RSF agregada: {len(table_data)} rows")
+            print(f"""RSF table added: {len(table_data)} rows""")
         else:
             self.elements.append(Paragraph(
                 ("RSF Model Summary<br/>" if self._is_english() else "Resumen del modelo RSF<br/>")
@@ -765,7 +765,7 @@ class SurvivalAnalysisPDFExporter:
         self.elements.append(Spacer(1, 0.3 * inch))
     
     def add_conclusions_section(self, conclusions_text=None):
-        """Agrega sección de conclusiones - 4. CONCLUSIÓN"""
+        """Add the conclusions section: 4. CONCLUSION."""
         self._add_section_title("4. CONCLUSION" if self._is_english() else "4. CONCLUSIÓN")
         
         if conclusions_text:
@@ -781,15 +781,15 @@ class SurvivalAnalysisPDFExporter:
         self.elements.append(Spacer(1, 0.3*inch))
     
     def add_graph_section(self, title="3. GRÁFICA"):
-        """Inicia sección de gráfica"""
+        """Start the chart section."""
         self._add_section_title(title)
         self.elements.append(Spacer(1, 0.2*inch))
     
     def _plotly_to_image(self, fig):
-        """Convierte figura Plotly a imagen (BytesIO) con alta resolución"""
+        """Convert a Plotly figure to a high-resolution image (BytesIO)."""
         try:
-            # Algunos callbacks devuelven un dcc.Graph completo. Extraemos la
-            # figura interna para exportar la misma grafica que ve el usuario.
+            # Some callbacks return a complete dcc.Graph. Extract its
+            # internal figure to export the same chart the user sees.
             if hasattr(fig, 'figure'):
                 fig = fig.figure
 
@@ -799,47 +799,47 @@ class SurvivalAnalysisPDFExporter:
             img_bytes = pio.to_image(fig, format='png', width=1400, height=700, scale=2)
             return io.BytesIO(img_bytes)
         except Exception as e:
-            print(f"Error convertiendo gráfica: {str(e)}")
+            print(f"""Error converting chart: {str(e)}""")
             return None
     
     def add_plotly_figure(self, fig, caption=""):
-        """Agrega una figura Plotly al PDF - GRANDE en LANDSCAPE"""
+        """Add a large Plotly figure to the PDF in landscape orientation."""
         if fig is None:
             return
         
         try:
-            # Algunos callbacks devuelven un dcc.Graph completo. Extraemos la
-            # figura interna para exportar la misma grafica que ve el usuario.
+            # Some callbacks return a complete dcc.Graph. Extract its
+            # internal figure to export the same chart the user sees.
             if hasattr(fig, 'figure'):
                 fig = fig.figure
 
-            # Si fig es string JSON, convertir a objeto Plotly
+            # Convert a JSON figure string to a Plotly object.
             if isinstance(fig, str):
                 try:
                     fig_dict = json.loads(fig)
                     fig = go.Figure(fig_dict)
                 except:
-                    print(f"No se pudo convertir JSON a figura Plotly")
+                    print(f"""Could not convert JSON to a Plotly figure""")
                     return
             if isinstance(fig, dict):
                 fig = go.Figure(fig)
             
-            # Convertir con dimensiones ALTAS para mejor resolución
-            # 1400x700 (proporción 2:1) para buena resolución
+            # Convert with LARGE dimensions for better resolution.
+            # 1400x700 (2:1 aspect ratio) for good resolution.
             img_bytes = pio.to_image(fig, format='png', width=1400, height=700, scale=2)
             img_io = io.BytesIO(img_bytes)
             
-            # Tamaño en PDF según orientación
+            # PDF size according to orientation.
             if self.has_graph:
-                # LANDSCAPE: mucho más espacio disponible
-                # Con márgenes de 0.3" a cada lado, ancho disponible es ~9.4"
-                # Usamos 9.0" x 4.5" para máxima visibilidad
+                # LANDSCAPE: much more space available.
+                # With 0.3-inch margins on each side, available width is approximately 9.4 inches.
+                # Use 9.0 x 4.5 inches for maximum visibility.
                 img = Image(img_io, width=9.0*inch, height=4.5*inch)
             else:
-                # PORTRAIT: espacio normal
+                # PORTRAIT: standard space.
                 img = Image(img_io, width=8.0*inch, height=4.0*inch)
             
-            # Agregar con poco espaciado
+            # Add with minimal spacing.
             self.elements.append(Spacer(1, 0.1*inch))
             self.elements.append(img)
             self.elements.append(Spacer(1, 0.15*inch))
@@ -849,23 +849,23 @@ class SurvivalAnalysisPDFExporter:
                 self.elements.append(caption_para)
                 self.elements.append(Spacer(1, 0.1*inch))
             
-            print(f"Figura Plotly agregada al PDF en LANDSCAPE (9.0\"x 4.5\")")
+            print(f"""Plotly figure added to PDF in LANDSCAPE (9.0" x 4.5")""")
         except Exception as e:
-            print(f"Error al agregar figura Plotly: {str(e)}")
+            print(f"""Error adding Plotly figure: {str(e)}""")
     
-    def generate(self, title="INFORME DE ANÁLISIS DE SUPERVIVENCIA"):
-        """Genera el PDF final en landscape si hay gráficas"""
-        # Seleccionar orientación basada en si hay gráficas
+    def generate(self, title="SURVIVAL ANALYSIS REPORT"):
+        """Generate the final PDF in landscape orientation if charts are present."""
+        # Select orientation based on whether charts are present.
         if self.has_graph:
             pagesize = landscape(letter)
-            # Márgenes para landscape
+            # Landscape margins.
             right_margin = 0.3*inch
             left_margin = 0.3*inch
             top_margin = 0.5*inch
             bottom_margin = 0.5*inch
         else:
             pagesize = letter
-            # Márgenes para portrait
+            # Portrait margins.
             right_margin = 0.35*inch
             left_margin = 0.35*inch
             top_margin = 0.6*inch
@@ -880,18 +880,18 @@ class SurvivalAnalysisPDFExporter:
             bottomMargin=bottom_margin
         )
         
-        # Construir PDF con los elementos que ya están en self.elements
+        # Build the PDF with the existing self.elements.
         def _draw_page_decorations(canvas_obj, doc_obj):
-            """Dibuja logos, cabecera, linea superior y pie de pagina en cada hoja."""
+            """Draw logos, header, top line, and footer on every page."""
             canvas_obj.saveState()
             page_width, page_height = doc_obj.pagesize
 
-            # Línea superior
+            # Top line.
             canvas_obj.setStrokeColor(colors.HexColor('#d9e5f3'))
             canvas_obj.setLineWidth(0.75)
             canvas_obj.line(doc_obj.leftMargin, page_height - 0.66 * inch, page_width - doc_obj.rightMargin, page_height - 0.66 * inch)
 
-            # Logos
+            # Logos.
             logo_width = 0.48 * inch
             logo_height = 0.48 * inch
             if LOGO_PATH.exists():
@@ -922,14 +922,14 @@ class SurvivalAnalysisPDFExporter:
                 except Exception:
                     pass
 
-            # Texto entre logos solo en la primera página: "nombre: fecha hora"
+            # Text between logos on the first page only: "name: date time".
             if canvas_obj.getPageNumber() == 1:
                 canvas_obj.setFont('Times-Bold', 10.5)
                 canvas_obj.setFillColor(colors.HexColor('#1f77b4'))
                 header_text = f"{self.report_name}: {self._format_header_datetime()}"
                 canvas_obj.drawCentredString(page_width / 2, page_height - 0.28 * inch, header_text)
 
-            # Pie
+            # Footer.
             canvas_obj.setStrokeColor(colors.HexColor('#d9e5f3'))
             canvas_obj.setLineWidth(0.8)
             canvas_obj.line(doc_obj.leftMargin, 0.55 * inch, page_width - doc_obj.rightMargin, 0.55 * inch)
@@ -943,13 +943,13 @@ class SurvivalAnalysisPDFExporter:
             canvas_obj.restoreState()
 
         doc.build(self.elements, onFirstPage=_draw_page_decorations, onLaterPages=_draw_page_decorations)
-        print(f"[OK] PDF generado exitosamente: {self.filename}")
+        print(f"""[OK] PDF generated successfully: {self.filename}""")
 
 
-# Función utilitaria para exporte rápido
+# Utility function for quick export.
 def export_survival_analysis_to_pdf(
     filename,
-    title="INFORME DE ANÁLISIS DE SUPERVIVENCIA",
+    title="SURVIVAL ANALYSIS REPORT",
     report_name=None,
     header_datetime=None,
     include_summary=False,
@@ -978,25 +978,27 @@ def export_survival_analysis_to_pdf(
     include_ai_interpretation=False,
     ai_text="",
     summary_stats=None,
-    language='es',
+    language='en',
     landscape_tables=None,
     include_graph=None
 ):
     """
-    Función helper para exportar análisis a PDF de forma simple.
-    Solo incluye lo que el usuario marcó (include_summary, include_km, include_cox, include_ai_interpretation).
-    
+    Helper for exporting an analysis to PDF.
+    Include only selected content (include_summary, include_km, include_cox,
+    include_ai_interpretation).
+
     Args:
-        include_summary: Si mostrar la sección de resumen general
-        include_km: Si mostrar análisis Kaplan-Meier
-        include_cox: Si mostrar análisis Cox Regression
-        include_ai_interpretation: Si mostrar interpretación de IA
-        landscape_tables: Lista de nombres de tablas que deben estar en horizontal ['logrank', 'cox', etc]
-        include_graph: Si FORCE landscape (None=auto-detect, True/False=explicit)
+        include_summary: Whether to show the general summary section.
+        include_km: Whether to show Kaplan-Meier analysis.
+        include_cox: Whether to show Cox regression analysis.
+        include_ai_interpretation: Whether to show the AI interpretation.
+        landscape_tables: Table names requiring landscape orientation,
+            e.g. ['logrank', 'cox'].
+        include_graph: Force orientation (None=auto-detect, True/False=explicit).
     """
-    # Detectar si hay gráficas para usar landscape
+    # Detect charts to use landscape orientation.
     if include_graph is None:
-        # Auto-detect: landscape si hay ALGUNA figura
+        # Auto-detect: landscape if ANY figure exists.
         has_graph = (include_km and km_figure is not None) or \
                     (include_cox and forest_figure is not None) or \
                     (include_logrank and logrank_figure is not None) or \
@@ -1005,7 +1007,7 @@ def export_survival_analysis_to_pdf(
                     (include_rsf and (rsf_figure is not None or rsf_importance_figure is not None)) or \
                     (include_rsf_profile and rsf_profile_figure is not None)
     else:
-        # Usar valor explícito (True = forzar landscape, False = forzar portrait)
+        # Use the explicit value (True = force landscape, False = force portrait).
         has_graph = include_graph
     
     exporter = SurvivalAnalysisPDFExporter(
@@ -1018,27 +1020,27 @@ def export_survival_analysis_to_pdf(
     if landscape_tables is None:
         landscape_tables = []
     
-    # ENCABEZADO SIMPLE (solo título y fecha) - MINIMAL SPACING
+    # SIMPLE HEADER (title and date only), MINIMAL SPACING.
     exporter.elements.append(Spacer(1, 0.18*inch))
     title_para = Paragraph(title, exporter.styles['CustomTitle'])
     exporter.elements.append(title_para)
     exporter.elements.append(Spacer(1, 0.16*inch))
     
-    print(f"[PDF BUILDER] Elementos iniciales (header): {len(exporter.elements)}")
+    print(f"""[PDF BUILDER] Initial elements (header): {len(exporter.elements)}""")
     
-    # ESTRUCTURA CONDICIONAL: Solo agrega lo que fue marcado
+    # CONDITIONAL STRUCTURE: Add only selected content.
     numero_seccion = 1
     primera_seccion = True
 
     def _start_new_section():
-        """Inserta un salto de pagina antes de empezar una nueva seccion si procede."""
+        """Insert a page break before a new section when appropriate."""
         nonlocal primera_seccion
         if primera_seccion:
             primera_seccion = False
             return
         exporter.elements.append(PageBreak())
     
-    # 1. RESUMEN GENERAL
+    # 1. GENERAL SUMMARY.
     if summary_stats:
         _start_new_section()
         exporter.add_summary_section(
@@ -1049,9 +1051,9 @@ def export_survival_analysis_to_pdf(
         )
         numero_seccion += 1
     
-    # 2. TABLA DE RESULTADOS (omitido para Kaplan-Meier)
+    # 2. RESULTS TABLE (omitted for Kaplan-Meier).
     tabla_agregada = False
-    # La tabla de KM se omite por completo (no aparece en opciones del usuario)
+    # Omit the KM table entirely; it is not offered in the user options.
     if include_cox:
         _start_new_section()
         exporter.add_cox_regression_section(cox_table)
@@ -1076,7 +1078,7 @@ def export_survival_analysis_to_pdf(
     if tabla_agregada:
         numero_seccion += 1
     
-    # 3. GRÁFICA
+    # 3. CHART.
     grafica_agregada = False
     if include_km and km_figure is not None:
         _start_new_section()
@@ -1136,16 +1138,16 @@ def export_survival_analysis_to_pdf(
     if grafica_agregada:
         numero_seccion += 1
     
-    # 4. CONCLUSIÓN - SOLO si fue marcada en las opciones
+    # 4. CONCLUSION: ONLY if selected in the options.
     if include_ai_interpretation and ai_text:
         _start_new_section()
         exporter.elements.append(Spacer(1, 0.14 * inch))
         exporter._add_section_title(f"{numero_seccion}. CONCLUSION" if exporter._is_english() else f"{numero_seccion}. CONCLUSIÓN")
         exporter._add_paragraph_block(ai_text, 'InterpretationText')
     
-    print(f"[PDF BUILDER] Elementos antes de generate(): {len(exporter.elements)}")
+    print(f"""[PDF BUILDER] Elements before generate(): {len(exporter.elements)}""")
     
-    # Generar PDF
+    # Generate the PDF.
     exporter.generate(title)
 
 
@@ -1166,9 +1168,9 @@ def export_weibull_exponential_combined_pdf(
     exponential_figure=None,
     ai_text="",
     summary_stats=None,
-    language='es'
+    language='en'
 ):
-    """Genera un informe combinado con secciones de Weibull y Exponencial."""
+    """Generate a combined report with Weibull and Exponential sections."""
     has_graph = include_graph and (
         (include_weibull and weibull_figure is not None) or
         (include_exponential and exponential_figure is not None)
@@ -1190,7 +1192,7 @@ def export_weibull_exponential_combined_pdf(
     first_section = True
 
     def _start_new_section():
-        """Inserta un salto de pagina entre secciones del informe combinado."""
+        """Insert a page break between combined report sections."""
         nonlocal first_section
         if first_section:
             first_section = False
@@ -1206,7 +1208,7 @@ def export_weibull_exponential_combined_pdf(
             summary_stats.get('follow_up_median', 0)
         )
 
-        # Texto fijo para contextualizar la relación metodológica entre ambos modelos.
+        # Fixed text explaining the methodological relationship between the two models.
         relation_text = (
             "Methodological note: the Exponential model is a special case of the Weibull model when the shape parameter is k = 1. "
             "Therefore, both techniques are directly comparable: if Weibull estimates k close to 1, Exponential can be considered an adequate simplification; "

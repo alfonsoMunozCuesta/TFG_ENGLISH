@@ -1,8 +1,8 @@
-"""Construccion de las paginas y componentes visuales del dashboard.
+"""Build the dashboard pages and visual components.
 
-Este modulo contiene funciones puras de layout Dash: modales, paginas de
-analisis, tablas y paneles. Los callbacks que dan vida a estos componentes se
-registran en analysis_callbacks.py y pdf_callbacks.py.
+This module contains pure Dash layout functions: modals, analysis pages,
+tables, and panels. Callbacks for these components are registered
+in analysis_callbacks.py and pdf_callbacks.py.
 """
 
 import pandas as pd
@@ -14,16 +14,16 @@ import base64
 import io
 from kaplan_meier import plot_kaplan_meier, plot_km_G, plot_km_disc 
 import numpy as np
-from translations import get_translation
+from translations import get_translation, get_display_text, get_display_records
 from pdf_exporter import export_survival_analysis_to_pdf
 
-# Cache local para la vista Kaplan-Meier global. Se rellena solo si una pagina
-# lo necesita, evitando cargar el CSV durante el import del modulo.
+# Local cache for the global Kaplan-Meier view. Populate only when a page
+# needs it, avoiding CSV loading during module import.
 _LAYOUT_DF = None
 
-# Función para mapear age_band desde one-hot encoding
+# Map age_band from one-hot encoding.
 def map_age_band(row):
-    """Agrupa las columnas one-hot de edad en una etiqueta legible."""
+    """Combine one-hot age columns into a readable label."""
     if row.get('age_band_0-35', 0) == 1:
         return '0-35 años'
     elif row.get('age_band_35-55', 0) == 1:
@@ -32,9 +32,9 @@ def map_age_band(row):
         return '55+ años'
     return 'Desconocido'
 
-# Función para mapear highest_education desde one-hot encoding
+# Map highest_education from one-hot encoding.
 def map_highest_education(row):
-    """Agrupa las columnas one-hot de educacion en una etiqueta legible."""
+    """Combine one-hot education columns into a readable label."""
     education_map = {
         'highest_education_A Level or Equivalent': 'A Level o Equivalente',
         'highest_education_HE Qualification': 'Calificación HE',
@@ -48,7 +48,7 @@ def map_highest_education(row):
     return 'Desconocido'
 
 def _get_layout_df():
-    """Carga dataset solo cuando hace falta para evitar trabajo pesado al importar el modulo."""
+    """Load the dataset only when needed to avoid expensive work during import."""
     global _LAYOUT_DF
     if _LAYOUT_DF is not None:
         return _LAYOUT_DF
@@ -92,8 +92,8 @@ def _get_layout_df():
     return _LAYOUT_DF
 
 
-def _create_ai_response_box(answer_id, loading_message, language='es'):
-    """Crea la caja de respuesta IA con el mismo formato en todas las tecnicas."""
+def _create_ai_response_box(answer_id, loading_message, language='en'):
+    """Create an AI response box with consistent formatting across all techniques."""
     return html.Div([
         dcc.Textarea(
             id=answer_id,
@@ -122,14 +122,14 @@ def _create_ai_response_box(answer_id, loading_message, language='es'):
     ], style={'textAlign': 'center'})
 
 
-# ===== COMPONENTE MODAL PARA EXPORTAR A PDF =====
-def create_pdf_export_modal(modal_id, analysis_type="kaplan-meier", language='es'):
+# ===== PDF EXPORT MODAL COMPONENT =====
+def create_pdf_export_modal(modal_id, analysis_type="kaplan-meier", language='en'):
     """
-    Crea un modal para seleccionar qué incluir en la exportación a PDF
-    
+    Create a modal for selecting PDF export content.
+
     Args:
-        modal_id: ID único del modal
-        analysis_type: tipo de análisis ('kaplan-meier', 'cox-regression', 'log-rank')
+        modal_id: Unique modal ID.
+        analysis_type: Analysis type ('kaplan-meier', 'cox-regression', 'log-rank').
     """
     if analysis_type == 'weibull-exponential-combined':
         return html.Div([
@@ -303,10 +303,10 @@ def create_pdf_export_modal(modal_id, analysis_type="kaplan-meier", language='es
             )
         ])
 
-    # Todas las opciones comienzan DESMARCADAS por defecto
+    # All options start UNCHECKED by default.
     default_values = []
     
-    # Para KM: crear opciones sin tabla (se oculta con CSS)
+    # For KM: create options without a table (hidden with CSS).
     if analysis_type == 'kaplan-meier':
         options = [
             {'label': f" {'Resumen general' if language == 'es' else 'Summary'}", 'value': 'summary'},
@@ -344,7 +344,7 @@ def create_pdf_export_modal(modal_id, analysis_type="kaplan-meier", language='es
         ]
     
     return html.Div([
-        # Overlay oscuro del modal
+        # Dark modal overlay.
         html.Div(
             id=f"{modal_id}-overlay",
             style={
@@ -360,7 +360,7 @@ def create_pdf_export_modal(modal_id, analysis_type="kaplan-meier", language='es
             }
         ),
         
-        # Caja del modal
+        # Modal box.
         html.Div(
             id=f"{modal_id}-container",
             style={
@@ -399,28 +399,28 @@ def create_pdf_export_modal(modal_id, analysis_type="kaplan-meier", language='es
                     )
                 ], style={'position': 'relative', 'marginBottom': '20px'}),
                 
-                # Opciones de exportación
+                # Export options.
                 html.Div([
-                    # Instrucciones
+                    # Instructions.
                     html.P(
                         get_translation(language, 'pdf_modal_instruction'),
                         style={'color': '#555', 'fontSize': '14px', 'fontStyle': 'italic', 'marginBottom': '15px'}
                     ),
                     
-                    # Sección: Contenido
+                    # Content section.
                     html.Div([
                         html.H4(f"{get_translation(language, 'pdf_modal_content')}", style={'color': '#34495e', 'marginTop': 0}),
                         
                         dcc.Checklist(
                             id=f"{modal_id}-checklist-content",
-                            options=options,  # Opciones dinámicas según el análisis
-                            value=default_values,  # Todas desmarcadas por defecto
+                            options=options,  # Dynamic options based on the analysis.
+                            value=default_values,  # All unchecked by default.
                             style={'marginBottom': '15px', 'lineHeight': '1.8'},
                             labelStyle={'display': 'block', 'marginBottom': '8px'}
                         )
                     ], style={'marginBottom': '20px', 'padding': '15px', 'backgroundColor': '#f8fbff', 'borderRadius': '8px'}),
                     
-                    # Nombre del archivo
+                    # File name.
                     html.Div([
                         html.Label(f"{get_translation(language, 'pdf_modal_filename_label')}", style={'fontWeight': 'bold', 'color': '#34495e'}),
                         dcc.Input(
@@ -443,7 +443,7 @@ def create_pdf_export_modal(modal_id, analysis_type="kaplan-meier", language='es
                         ], style={'marginBottom': '20px'}),
                     ], style={'marginBottom': '20px'}),
 
-                    # Botones de acción
+                    # Action buttons.
                     html.Div([
                         html.Button(
                             get_translation(language, 'pdf_modal_cancel'),
@@ -494,22 +494,22 @@ def create_pdf_export_modal(modal_id, analysis_type="kaplan-meier", language='es
                     **{'data-loading-message': 'Preparando informe PDF...' if language == 'es' else 'Preparing PDF report...'}
                 ),
                 
-                # Componente de descarga
+                # Download component.
                 dcc.Download(id=f"{modal_id}-download"),
             ]
         ),
         
-        # Store para mantener datos del análisis actual
+        # Store the current analysis data.
         dcc.Store(id=f"{modal_id}-analysis-data")
     ])
 
 
-# Funciones para crear páginas dinámicamente con soporte multilingüe
-def create_survival_analysis_page(language='es'):
-    """Construye la pagina principal de analisis de supervivencia."""
+# Create pages dynamically with multilingual support.
+def create_survival_analysis_page(language='en'):
+    """Build the main survival analysis page."""
     techniques = [
         {
-            'image': '/assets/weibull.png?v=2',
+            'image': '/assets/weibull_en.svg' if language == 'en' else '/assets/weibull.png?v=2',
             'image_style': {'width': '78%', 'display': 'block', 'margin': '0 auto', 'marginTop': '30px', 'marginBottom': '20px'},
             'label_key': 'weibull_analysis',
             'href': '/survival-analysis/weibull'
@@ -548,7 +548,7 @@ def create_survival_analysis_page(language='es'):
 
     return html.Div([  
         html.H1(get_translation(language, 'survival_analysis'), style={'textAlign': 'center'}),
-        # Barra de navegación interna
+        # Internal navigation bar.
         html.Div([
             html.Div([
                 html.Img(src=technique['image'], style=technique['image_style']),
@@ -565,13 +565,13 @@ def create_survival_analysis_page(language='es'):
             )
         ], className='techniques-comparison-cta'),
 
-        # Contenedor para mostrar el gráfico de Kaplan-Meier
+        # Container for the Kaplan-Meier chart.
         html.Div(id='survival_analysis_page', children=[]),
     ])
 
 
-def create_techniques_comparison_page(language='es'):
-    """Construye la pagina que compara las tecnicas disponibles."""
+def create_techniques_comparison_page(language='en'):
+    """Build the page comparing the available techniques."""
     is_en = language == 'en'
 
     comparison_rows = [
@@ -800,7 +800,7 @@ def create_techniques_comparison_page(language='es'):
     required_metric_cols = ['Predictivo', 'Interpretabilidad', 'Flexibilidad']
     available_metric_cols = [col for col in required_metric_cols if col in metrics_df.columns]
 
-    # Garantiza que la gráfica use columnas válidas y valores numéricos en escala comparable.
+    # Ensure the chart uses valid columns and numeric values on a comparable scale.
     if available_metric_cols:
         for col in available_metric_cols:
             metrics_df[col] = pd.to_numeric(metrics_df[col], errors='coerce').fillna(0).clip(lower=0, upper=5)
@@ -969,8 +969,8 @@ def create_techniques_comparison_page(language='es'):
         })
     ])
 
-def create_weibull_analysis_page(language='es'):
-    """Construye la vista dedicada al modelo Weibull."""
+def create_weibull_analysis_page(language='en'):
+    """Build the dedicated Weibull model view."""
     return html.Div([
         html.H1(
             get_translation(language, 'survival_analysis_prefix').format(name=get_translation(language, 'weibull_analysis')),
@@ -1036,8 +1036,8 @@ def create_weibull_analysis_page(language='es'):
         create_pdf_export_modal('weibexp-pdf-modal', 'weibull-exponential-combined', language)
     ])
 
-def create_exponential_analysis_page(language='es'):
-    """Construye la vista dedicada al modelo exponencial."""
+def create_exponential_analysis_page(language='en'):
+    """Build the dedicated Exponential model view."""
     return html.Div([
         html.H1(
             get_translation(language, 'survival_analysis_prefix').format(name=get_translation(language, 'exponential_analysis')),
@@ -1104,8 +1104,8 @@ def create_exponential_analysis_page(language='es'):
     ])
 
 
-def create_rsf_analysis_page(language='es'):
-    """Construye la vista dedicada al Random Survival Forest."""
+def create_rsf_analysis_page(language='en'):
+    """Build the dedicated Random Survival Forest view."""
     if language == 'es':
         profile_card_title = 'Simular perfil individual'
         profile_card_note = 'Selecciona un perfil concreto para obtener su curva de supervivencia estimada por RSF.'
@@ -1277,8 +1277,8 @@ def create_rsf_analysis_page(language='es'):
         dcc.Store(id='rsf-profile-data')
     ])
 
-def create_ver_dataset_page(language='es'):
-    """Construye la pagina de inspeccion del dataset limpio."""
+def create_ver_dataset_page(language='en'):
+    """Build the clean dataset inspection page."""
     layout_df = _get_layout_df()
 
     variable_info_catalog = [
@@ -1394,7 +1394,7 @@ def create_ver_dataset_page(language='es'):
             dash_table.DataTable(
                 id='clean-dataset-table',
                 columns=[{"name": col, "id": col} for col in layout_df.columns],  
-                data=layout_df.to_dict('records'),  # convertir el DataFrame en un formato que Dash pueda usar
+                data=get_display_records(layout_df, language),  # Convert the DataFrame into a format Dash can use.
                 style_table={
                     'overflowX': 'auto',
                     'overflowY': 'hidden',
@@ -1402,7 +1402,7 @@ def create_ver_dataset_page(language='es'):
                     'maxHeight': '74vh',
                     'width': '100%'
                 },
-                style_cell={'textAlign': 'left', 'whiteSpace': 'normal', 'height': 'auto', 'lineHeight': '15px'},  # Asegurarse de que el texto esté alineado
+                style_cell={'textAlign': 'left', 'whiteSpace': 'normal', 'height': 'auto', 'lineHeight': '15px'},  # Ensure text is aligned.
             ),
         ], style={'textAlign': 'center', 'marginTop': '20px', 'width': '100%'}),
 
@@ -1431,12 +1431,12 @@ def create_ver_dataset_page(language='es'):
         })
     ], style={'width': '99%', 'margin': '0 auto'})
 
-# Función para crear página de análisis de covariables con soporte multilingüe
-# Estilos CSS globales para mejorar interfaz - ahora aplicados inline
-# Se pueden usar en los labelStyle de RadioItems
+# Create the covariate analysis page with multilingual support.
+# Global CSS styles to improve the interface, now applied inline.
+# These can be used in RadioItems labelStyle.
 
-def create_covariate_analysis_page(language='es'):
-    """Construye la pagina de seleccion y analisis de covariables."""
+def create_covariate_analysis_page(language='en'):
+    """Build the covariate selection and analysis page."""
     return html.Div([
         # Header
         html.Div([
@@ -1461,7 +1461,7 @@ def create_covariate_analysis_page(language='es'):
             )
         ], className='section-header formal-card', style={'backgroundColor': '#f8fbff', 'padding': '30px', 'borderRadius': '10px', 'margin': '20px'}),
         
-        # Botones de selección
+        # Selection buttons.
         html.Div([
             html.Div([
                 html.Label(
@@ -1501,10 +1501,10 @@ def create_covariate_analysis_page(language='es'):
             })
         ]),
         
-        # Contenido principal
+        # Main content.
         html.Div([
             html.Div([
-                # Gráfico
+                # Chart.
                 html.Div([
                     dcc.Loading(
                         id="loading-covariables",
@@ -1529,7 +1529,7 @@ def create_covariate_analysis_page(language='es'):
                     'marginRight': '20px'
                 }),
                 
-                # Panel de explicación
+                # Explanation panel.
                 html.Div([
                     html.H3(f"{get_translation(language, 'interpretacion')}", style={'color': '#1abc9c', 'marginTop': '0', 'fontWeight': 'bold'}),
                     html.Div(
@@ -1550,9 +1550,9 @@ def create_covariate_analysis_page(language='es'):
         ], style={'margin': '20px'})
     ])
 
-# Función para crear página de regresión de Cox con soporte multilingüe
-def create_cox_regression_page(language='es'):
-    """Construye la vista de regresion de Cox."""
+# Create the Cox regression page with multilingual support.
+def create_cox_regression_page(language='en'):
+    """Build the Cox regression view."""
     return html.Div([
         html.H1(get_translation(language, 'survival_analysis_prefix').format(name=get_translation(language, 'cox_regression')), style={'textAlign': 'center','fontSize': '35px'}),
     
@@ -1567,7 +1567,7 @@ def create_cox_regression_page(language='es'):
                     {'label': get_translation(language, 'creditos_estudiados'), 'value': 'studied_credits'}
                 ],
                 placeholder=get_translation(language, 'elige_covariable_cox'),  
-                multi=True,  # Permite seleccionar varias covariables
+                multi=True,  # Allow selecting multiple covariates.
                 style={'width': '60%', 'margin': 'auto'}
             ),
         ], style={'textAlign': 'center', 'marginTop': '30px'}),
@@ -1585,7 +1585,7 @@ def create_cox_regression_page(language='es'):
             style={'textAlign': 'center', 'marginTop': '20px'}
         ),
         
-        # Botones de acción
+        # Action buttons.
         html.Div([
             html.Button(get_translation(language, 'explicar_cox'), id='btn-cox', 
                      title=("Selecciona covariables y ejecuta Cox antes de explicar" if language == 'es' else "Select covariates and run Cox before generating an explanation"),
@@ -1603,19 +1603,19 @@ def create_cox_regression_page(language='es'):
             language
         ),
         
-        # Modal de exportación a PDF
+        # PDF export modal.
         create_pdf_export_modal('cox-pdf-modal', 'cox-regression', language),
         
-        # Store para mantener datos del análisis actual
+        # Store the current analysis data.
         dcc.Store(id='cox-analysis-data')
     ])
 
-# Función para crear página de Kaplan-Meier con soporte multilingüe
-def create_kaplan_meier_page(language='es'):
-    """Construye la vista de Kaplan-Meier."""
+# Create the Kaplan-Meier page with multilingual support.
+def create_kaplan_meier_page(language='en'):
+    """Build the Kaplan-Meier view."""
     layout_df = _get_layout_df()
     km_global_component = (
-        plot_kaplan_meier(layout_df)
+        plot_kaplan_meier(layout_df, language=language)
         if not layout_df.empty and all(col in layout_df.columns for col in ['date', 'final_result'])
         else html.Div(
             "No hay datos suficientes para mostrar Kaplan-Meier" if language == 'es' else "Not enough data to display Kaplan-Meier",
@@ -1627,14 +1627,14 @@ def create_kaplan_meier_page(language='es'):
     html.H1(get_translation(language, 'survival_analysis_prefix').format(name=get_translation(language, 'kaplan_meier')), 
                 style={'textAlign': 'center', 'fontSize': '35px', 'marginBottom': '30px', 'color': '#1a1a1a', 'fontWeight': 'bold'}),
         
-        # ===== GRÁFICA GLOBAL =====
+        # ===== GLOBAL CHART =====
         html.Div([
             html.H3(f"{'Curva de Kaplan-Meier General' if language == 'es' else 'General Kaplan-Meier curve'}", style={'textAlign': 'center', 'color': '#0d0d0d', 'fontWeight': 'bold'}),
             html.Div(id='km-global-div', children=km_global_component,
                     style={'padding': '20px', 'backgroundColor': '#f8f9fa', 'borderRadius': '10px'})
         ], style={'marginBottom': '40px', 'boxShadow': '0 2px 8px rgba(0,0,0,0.1)', 'padding': '20px', 'borderRadius': '10px'}),
         
-        # ===== BOTONES DE SELECCIÓN =====
+        # ===== SELECTION BUTTONS =====
         html.Div([
             html.Label(get_translation(language, 'selecciona_covariable_kaplan'), 
                       style={'fontWeight':'bold', 'fontSize': '1.1em', 'marginBottom': '15px', 'display': 'block', 'color': '#1a1a1a'}),
@@ -1661,7 +1661,7 @@ def create_kaplan_meier_page(language='es'):
         ], style={'textAlign': 'center', 'marginTop': '30px', 'marginBottom': '30px', 'padding': '20px', 
                  'backgroundColor': '#f8fbff', 'borderRadius': '10px', 'border': '1px solid #ddd'}),
         
-        # ===== GRÁFICA DE COVARIABLE (Solo aparece si se selecciona algo) =====
+        # ===== COVARIATE CHART (shown only when a selection is made) =====
         html.Div(
             dcc.Loading(
                 id='loading-km-covariate',
@@ -1676,7 +1676,7 @@ def create_kaplan_meier_page(language='es'):
                    'borderRadius': '10px', 'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'}
         ),
         
-        # ===== BOTONES DE ACCIÓN =====
+        # ===== ACTION BUTTONS =====
         html.Div([
             html.Button(get_translation(language, 'explicar_kaplan'), id='explicar-btn-kaplan', 
                      title=("Selecciona una covariable para generar una explicación estratificada" if language == 'es' else "Select a covariate to generate a stratified explanation"),
@@ -1688,23 +1688,23 @@ def create_kaplan_meier_page(language='es'):
                              'borderRadius': '8px', 'cursor': 'pointer', 'fontSize': '14px', 'fontWeight': 'bold'}),
         ], style={'textAlign': 'center', 'marginTop': '20px'}),
         
-        # ===== TEXTAREA PARA EXPLICACIÓN =====
+        # ===== EXPLANATION TEXT AREA =====
         _create_ai_response_box(
             'openai-answer-kaplan',
             'Generando interpretación Kaplan-Meier...' if language == 'es' else 'Generating Kaplan-Meier interpretation...',
             language
         ),
         
-        # Store para mantener variable actual
+        # Store the current variable.
         dcc.Store(id='km-current-variable', data=''),
         
-        # Modal de exportación a PDF
+        # PDF export modal.
         create_pdf_export_modal('km-pdf-modal', 'kaplan-meier', language)
     ])
 
-#Función para crear página de análisis de log-rank con soporte multilingüe
-def create_log_rank_page(language='es'):
-    """Construye la vista del Test Log-Rank."""
+# Create the Log-Rank analysis page with multilingual support.
+def create_log_rank_page(language='en'):
+    """Build the Log-Rank test view."""
     return html.Div([
         html.H1(get_translation(language, 'survival_analysis_prefix').format(name=get_translation(language, 'log_rank_test')), style={'textAlign': 'center', 'fontSize': '35px'}),
         
@@ -1725,7 +1725,7 @@ def create_log_rank_page(language='es'):
             ),
         ], style={'textAlign': 'center', 'marginTop': '30px'}),
 
-        # Este div se actualizará con el resultado del Log-Rank Test
+        # This div is updated with the Log-Rank test results.
         html.Div(
             dcc.Loading(
                 id='loading-logrank-test',
@@ -1739,7 +1739,7 @@ def create_log_rank_page(language='es'):
             style={'textAlign': 'center', 'marginTop': '20px'}
         ),
         
-        # Botones de acción
+        # Action buttons.
         html.Div([
             html.Button(get_translation(language, 'explicar_logrank'), id='explicar-btn-logrank', 
                      title=("Selecciona covariables y ejecuta Log-Rank antes de explicar" if language == 'es' else "Select covariates and run Log-Rank before generating an explanation"),
@@ -1757,23 +1757,23 @@ def create_log_rank_page(language='es'):
             language
         ),
         
-        # Modal de exportación a PDF
+        # PDF export modal.
         create_pdf_export_modal('logrank-pdf-modal', 'log-rank', language),
         
-        # Store para mantener datos del análisis actual
+        # Store the current analysis data.
         dcc.Store(id='logrank-analysis-data')
     ])
 
-def display_logrank_summary_table(result):
-    """Transforma los resultados del Log-Rank en una tabla Dash legible."""
+def display_logrank_summary_table(result, language='en'):
+    """Convert Log-Rank results into a readable Dash table."""
     df_show = result[['Covariable','Grupo A','Grupo B',
                       'n A','n B','test_statistic','p_value','-log2(p)',
                       'Decisión','Conclusión']].copy()
 
     return dash_table.DataTable(
         id='logrank-summary-table',
-        columns=[{"name": col, "id": col} for col in df_show.columns],
-        data=df_show.to_dict('records'),
+        columns=[{"name": get_display_text(language, col), "id": col} for col in df_show.columns],
+        data=get_display_records(df_show, language),
         style_table={'height': '150px', 'overflowY': 'auto', 'width': '58%', 'margin': 'auto'},
         style_cell={'textAlign': 'center', 'whiteSpace': 'normal', 'height': 'auto', 'lineHeight': '15px'},
         style_header={'fontWeight': 'bold', 'backgroundColor': '#f4f7f6'},

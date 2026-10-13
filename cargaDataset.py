@@ -1,16 +1,16 @@
-﻿"""Punto de entrada de la aplicacion Dash.
+﻿"""Entry point for the Dash application.
 
-Define la instancia de Dash, la barra de navegacion, los stores compartidos y
-los callbacks de navegacion basicos. La logica pesada de analisis se registra
-desde analysis_callbacks.py y pdf_callbacks.py.
+Define the Dash instance, navigation bar, shared stores, and basic navigation
+callbacks. The main analysis logic is registered from analysis_callbacks.py
+and pdf_callbacks.py.
 """
 
 import os
 import platform as _platform
 from collections import namedtuple
 
-# Workaround para Python 3.13 en algunos Windows: platform.system() puede
-# bloquearse por una consulta WMI al importar Werkzeug/Dash.
+# Workaround for Python 3.13 on some Windows systems: platform.system() may
+# hang on a WMI query when importing Werkzeug/Dash.
 if os.name == 'nt':
     _Uname = namedtuple('Uname', ['system', 'node', 'release', 'version', 'machine', 'processor'])
     _fake_uname = _Uname('Windows', 'localhost', '10', '10.0', 'AMD64', 'AMD64')
@@ -33,30 +33,30 @@ from layout import (
 )
 from dash import callback_context
 from translations import get_translation
-from pdf_callbacks import register_pdf_export_callbacks  # PDF export HABILITADO
+from pdf_callbacks import register_pdf_export_callbacks  # PDF export ENABLED
 from analysis_callbacks import create_home_page, register_analysis_callbacks
 
-# Inicializar la aplicacion Dash. suppress_callback_exceptions permite declarar
-# callbacks de componentes que aparecen solo en determinadas paginas.
+# Initialize Dash. suppress_callback_exceptions allows declaring
+# callbacks for components that appear only on certain pages.
 app = Dash(__name__, suppress_callback_exceptions=True)
 app.config['suppress_callback_exceptions'] = True
 
 
-# Barra de navegacion fija en la parte superior. Las etiquetas se actualizan
-# dinamicamente cuando cambia el idioma.
+# Fixed navigation bar at the top. Labels update
+# dynamically when the language changes.
 navbar = html.Div([
     html.Div([ 
         html.Div([
-            html.Button(get_translation('es', 'navbar_home'), id='inicio-btn', n_clicks=0, className='navbar-link', style={'border': 'none', 'background': 'none', 'cursor': 'pointer', 'fontWeight': 'bold', 'fontSize': '14px'}),
-            dcc.Link(get_translation('es', 'navbar_view_dataset'), href='/ver-dataset', className='navbar-link', id='navbar-view-dataset'), 
-            dcc.Link(get_translation('es', 'navbar_covariate_analysis'), href='/covariate-analysis', className='navbar-link', id='navbar-covariate-analysis'),
-            dcc.Link(get_translation('es', 'navbar_survival_analysis'), href='/survival-analysis', className='navbar-link', id='navbar-survival-analysis'),
+            html.Button(get_translation('en', 'navbar_home'), id='inicio-btn', n_clicks=0, className='navbar-link', style={'border': 'none', 'background': 'none', 'cursor': 'pointer', 'fontWeight': 'bold', 'fontSize': '14px'}),
+            dcc.Link(get_translation('en', 'navbar_view_dataset'), href='/ver-dataset', className='navbar-link', id='navbar-view-dataset'),
+            dcc.Link(get_translation('en', 'navbar_covariate_analysis'), href='/covariate-analysis', className='navbar-link', id='navbar-covariate-analysis'),
+            dcc.Link(get_translation('en', 'navbar_survival_analysis'), href='/survival-analysis', className='navbar-link', id='navbar-survival-analysis'),
         ], className='navbar-links', style={'flex': '1'}),
-        # Selector de idioma con banderas + switch en la esquina derecha
+        # Language selector with flags and a switch in the right corner.
         html.Div([
             html.Img(
                 src='/assets/spain.jpg',
-                alt='Español',
+                alt='Spanish',
                 style={
                     'width': '28px',
                     'height': '20px',
@@ -67,7 +67,7 @@ navbar = html.Div([
             ),
             daq.ToggleSwitch(
                 id='language-toggle',
-                value=False,
+                value=True,
                 size=36,
                 color='#4a4a4a',
                 style={'margin': '0 10px'}
@@ -90,41 +90,41 @@ navbar = html.Div([
 app.layout = html.Div([ 
     navbar, 
     dcc.Location(id='url', refresh=False),  
-    # Los Stores guardan estado compartido entre callbacks sin escribirlo en
-    # disco: dataset procesado, idioma, resultados vigentes y textos de IA.
-    dcc.Store(id='language-store', data='es'),  # Store para almacenar el idioma actual
-    dcc.Store(id='df-store', data=None),  # Store para almacenar el dataframe procesado
-    dcc.Store(id='dataset-signature-store', data=''),  # Firma del dataset para invalidar análisis obsoletos
-    dcc.Store(id='km-current-variable', data=''),  # Store para rastrear variable actual en Kaplan-Meier
-    dcc.Store(id='cox-current-variables', data=''),  # Store para rastrear variables en Cox Regression
-    dcc.Store(id='logrank-current-variable', data=''),  # Store para rastrear variable en Log-Rank
-    dcc.Store(id='logrank-selected-covariables', data=[]),  # Store para covariables seleccionadas en Log-Rank
-    dcc.Store(id='cox-selected-covariables', data=[]),  # Store para covariables seleccionadas en Cox
-    dcc.Store(id='logrank-test-output-store', data=None),  # Store para resultados de Log-Rank
-    dcc.Store(id='cox-regression-output-store', data=None),  # Store para resultados de Cox
-    dcc.Store(id='cox-figure-store', data=None),  # Store para gráfica Forest Plot de Cox
-    dcc.Store(id='logrank-figure-store', data=None),  # Store para gráfica de Log-Rank
-    dcc.Store(id='weibull-ai-text-store', data=''),  # Store para guardar explicación IA Weibull
-    dcc.Store(id='exponential-ai-text-store', data=''),  # Store para guardar explicación IA Exponencial
-    dcc.Store(id='weibull-ai-language-store', data=''),  # Idioma en que se generó la IA de Weibull
-    dcc.Store(id='exponential-ai-language-store', data=''),  # Idioma en que se generó la IA de Exponencial
+    # Stores hold shared callback state without writing to
+    # disk: processed dataset, language, current results, and AI text.
+    dcc.Store(id='language-store', data='en'),  # Store the current language.
+    dcc.Store(id='df-store', data=None),  # Store the processed dataframe.
+    dcc.Store(id='dataset-signature-store', data=''),  # Dataset signature used to invalidate outdated analyses.
+    dcc.Store(id='km-current-variable', data=''),  # Track the current Kaplan-Meier variable.
+    dcc.Store(id='cox-current-variables', data=''),  # Track Cox regression variables.
+    dcc.Store(id='logrank-current-variable', data=''),  # Track the Log-Rank variable.
+    dcc.Store(id='logrank-selected-covariables', data=[]),  # Store selected Log-Rank covariates.
+    dcc.Store(id='cox-selected-covariables', data=[]),  # Store selected Cox covariates.
+    dcc.Store(id='logrank-test-output-store', data=None),  # Store Log-Rank results.
+    dcc.Store(id='cox-regression-output-store', data=None),  # Store Cox results.
+    dcc.Store(id='cox-figure-store', data=None),  # Store the Cox forest plot.
+    dcc.Store(id='logrank-figure-store', data=None),  # Store the Log-Rank chart.
+    dcc.Store(id='weibull-ai-text-store', data=''),  # Store the Weibull AI explanation.
+    dcc.Store(id='exponential-ai-text-store', data=''),  # Store the Exponential AI explanation.
+    dcc.Store(id='weibull-ai-language-store', data=''),  # Language used to generate the Weibull AI explanation.
+    dcc.Store(id='exponential-ai-language-store', data=''),  # Language used to generate the Exponential AI explanation.
     html.Div(id='page-content'),  
-    # Cuadro de confirmación
+    # Confirmation dialog.
     dcc.ConfirmDialog(
         id='confirm-dialog',
-        message='¿Estás seguro de que deseas volver a la página inicial? Perderás el dataset cargado y todo el análisis realizado.',
-        displayed=False,  # Inicialmente no se muestra
-        submit_n_clicks=0,  # Mantener el contador de clicks
+        message='Are you sure you want to return to the home page? You will lose the loaded dataset and all analysis performed.',
+        displayed=False,  # Initially hidden.
+        submit_n_clicks=0,  # Keep the click counter.
         cancel_n_clicks=0  
     )
 ])
-# Callback para almacenar el idioma seleccionado
+# Store the selected language.
 @app.callback(
     Output('language-store', 'data'),
     Input('language-toggle', 'value')
 )
 def update_language(toggle_value):
-    """Traduce el valor del interruptor de idioma al codigo usado por la aplicacion."""
+    """Convert the language switch value into the code used by the application."""
     return 'en' if toggle_value else 'es'
 
 
@@ -136,7 +136,7 @@ def update_language(toggle_value):
     Input('language-store', 'data')
 )
 def update_navbar_labels(language):
-    """Actualiza los textos del menu de navegacion segun el idioma activo."""
+    """Update navigation menu labels for the active language."""
     return (
         get_translation(language, 'navbar_home'),
         get_translation(language, 'navbar_view_dataset'),
@@ -148,16 +148,16 @@ def update_navbar_labels(language):
 @app.callback(
     Output('confirm-dialog', 'displayed'),
     Input('inicio-btn', 'n_clicks'),
-    prevent_initial_call=True  # Evita que se active al cargar la página
+    prevent_initial_call=True  # Prevent activation when the page loads.
 )
 def mostrar_confirmacion(n_clicks):
-    """Abre el dialogo de confirmacion al intentar cargar otro dataset."""
+    """Open the confirmation dialog when attempting to load another dataset."""
     if n_clicks:
         return True 
     return False
 
 def _create_dataset_locked_message(language):
-    """Construye el aviso que bloquea la carga de un segundo dataset."""
+    """Build the notice that blocks loading a second dataset."""
     return html.Div(
         [
             html.Div(
@@ -192,11 +192,11 @@ def _create_dataset_locked_message(language):
     Input('language-store', 'data')
 )
 def update_confirm_message(language):
-    """Refresca el mensaje del dialogo de confirmacion al cambiar de idioma."""
+    """Refresh the confirmation dialog message when the language changes."""
     return get_translation(language, 'confirmar_inicio')
 
 
-# Callbacks para manejar la navegación entre páginas
+# Handle navigation between pages.
 @app.callback(
     Output('page-content', 'children'),
     [Input('url', 'pathname'),
@@ -204,7 +204,7 @@ def update_confirm_message(language):
     [State('df-store', 'data')]
 )
 def display_page(pathname, language, df_json):
-    """Selecciona que pagina del dashboard debe mostrarse para la ruta actual."""
+    """Select the dashboard page to display for the current route."""
     dataset_loaded = df_json is not None
 
     if pathname == '/':
@@ -245,35 +245,35 @@ def display_page(pathname, language, df_json):
 )
 def navegar_a_inicio(submit_n_clicks, cancel_n_clicks):
 
-    """Decide si volver a inicio para cargar datos o mantener la pagina actual."""
+    """Decide whether to return home to load data or keep the current page."""
     ctx = callback_context
     if not ctx.triggered:
         return dash.no_update
     
     trigger_id = ctx.triggered[0]['prop_id']
     if 'submit_n_clicks' in trigger_id:
-        print("Aceptar clickeado")
+        print("Confirm clicked")
         return '/'
     
     if 'cancel_n_clicks' in trigger_id:
-        print("Cancelar clickeado")
+        print("Cancel clicked")
         return dash.no_update
     
     return dash.no_update
 
 
 if __name__ == '__main__':
-    print('[BOOT] Registrando callbacks principales...', flush=True)
+    print("[BOOT] Registering main callbacks...", flush=True)
     register_analysis_callbacks(app)
 
-    print('[BOOT] Registrando callbacks de exportación PDF...', flush=True)
-    register_pdf_export_callbacks(app)  # PDF export HABILITADO
+    print("[BOOT] Registering PDF export callbacks...", flush=True)
+    register_pdf_export_callbacks(app)  # PDF export ENABLED
 
     host = '127.0.0.1'
     port = 8050
     debug_mode = os.environ.get('DASH_DEBUG', '0').lower() in ('1', 'true', 'yes', 'on')
 
-    print(f'[BOOT] Iniciando Dash en http://{host}:{port} (debug={debug_mode}, reloader=False)', flush=True)
+    print(f"""[BOOT] Starting Dash at http://{host}:{port} (debug={debug_mode}, reloader=False)""", flush=True)
     if hasattr(app, 'run'):
         app.run(host=host, port=port, debug=debug_mode, use_reloader=False)
     else:

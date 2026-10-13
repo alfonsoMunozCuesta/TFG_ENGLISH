@@ -1,16 +1,16 @@
-﻿"""Callbacks principales del dashboard de analisis de supervivencia.
+﻿"""Main callbacks for the survival analysis dashboard.
 
-Este modulo concentra la logica interactiva de Dash: carga y validacion del
-CSV, preprocesamiento, navegacion entre vistas, ejecucion de analisis y
-generacion de interpretaciones mediante IA local.
+This module contains the interactive Dash logic: CSV upload and validation,
+preprocessing, navigation between views, running analyses, and generating
+interpretations using local AI.
 """
 
 import os
 import platform as _platform
 from collections import namedtuple
 
-# Workaround para Python 3.13 en algunos Windows: platform.system() puede
-# bloquearse por una consulta WMI al importar Werkzeug/Dash.
+# Workaround for Python 3.13 on some Windows systems: platform.system() may
+# hang on a WMI query when importing Werkzeug/Dash.
 if os.name == 'nt':
     _Uname = namedtuple('Uname', ['system', 'node', 'release', 'version', 'machine', 'processor'])
     _fake_uname = _Uname('Windows', 'localhost', '10', '10.0', 'AMD64', 'AMD64')
@@ -51,40 +51,40 @@ from ollama_AI import generate_interpretation_for_pdf, responder_pregunta_con_ll
 import plotly.graph_objs as go
 from dash import callback_context
 from dash.exceptions import PreventUpdate
-from translations import get_translation
-from pdf_callbacks import register_pdf_export_callbacks  # PDF export HABILITADO
+from translations import get_translation, get_display_text, get_display_records
+from pdf_callbacks import register_pdf_export_callbacks  # PDF export ENABLED
 
-# Inicializar la aplicación Dash
+# Initialize the Dash application.
 
-# Rutas base del proyecto usadas por los callbacks para leer datos temporales
-# y el dataset limpio sin depender del directorio desde el que se ejecute Dash.
+# Project paths used by callbacks to read temporary data
+# and the clean dataset regardless of Dash's working directory.
 BASE_DIR = Path(__file__).resolve().parent
 TEMP_DATA_PATH = BASE_DIR / 'data' / 'temp_data.csv'
 CLEAN_DATA_PATH = BASE_DIR / 'dataset_limpio.csv'
 DATASET_PREVIEW_MAX_ROWS = 100
 
-# Cache simple en memoria. Evita leer los CSV en cada callback y se inicializa
-# bajo demanda con load_dataframes().
+# Simple in-memory cache. Avoid reading CSV files in every callback;
+# initialize on demand with load_dataframes().
 df = None
 df_limpio = None
 
 def load_dataframes():
-    """Carga los dataframes bajo demanda si no existen."""
+    """Load dataframes on demand if they do not exist."""
     global df, df_limpio
     if df is None:
         try:
             df = pd.read_csv(TEMP_DATA_PATH, sep=';')
         except FileNotFoundError:
-            print("⚠️  Advertencia: temp_data.csv no encontrado")
+            print("⚠️  Warning: temp_data.csv not found")
     if df_limpio is None:
         try:
             df_limpio = pd.read_csv(CLEAN_DATA_PATH, sep=';')
         except FileNotFoundError:
-            print("⚠️  Advertencia: dataset_limpio.csv no encontrado")
+            print("⚠️  Warning: dataset_limpio.csv not found")
 
 
 def _read_split_json(json_value):
-    """Lee JSON con orient='split' sin depender de cadenas literales."""
+    """Read JSON with orient='split' without relying on literal strings."""
     if json_value is None:
         return None
     if isinstance(json_value, str):
@@ -93,7 +93,7 @@ def _read_split_json(json_value):
 
 
 def _humanize_label(value):
-    """Convierte etiquetas técnicas a texto legible para interpretación narrativa."""
+    """Convert technical labels into readable text for narrative interpretation."""
     if value is None:
         return "N/A"
 
@@ -111,14 +111,14 @@ def _humanize_label(value):
 
 
 def _dataset_signature_from_json(df_json):
-    """Genera una firma estable para detectar cambios de dataset en el flujo."""
+    """Generate a stable signature to detect dataset changes in the workflow."""
     if not df_json:
         return ""
     return str(hash(df_json))
 
 
 def _build_km_interpretation_context(df, variable_actual):
-    """Construye un resumen interpretable de la curva Kaplan-Meier actual."""
+    """Build an interpretable summary of the current Kaplan-Meier curve."""
     if df is None or 'date' not in df.columns or 'final_result' not in df.columns:
         return ""
 
@@ -137,7 +137,7 @@ def _build_km_interpretation_context(df, variable_actual):
     mid_followup_time = float(df['date'].median()) if len(df) else 0.0
 
     def _format_group_stats(label, group_df):
-        """Resume una curva visible de Kaplan-Meier para el prompt de IA."""
+        """Summarize a visible Kaplan-Meier curve for the AI prompt."""
         if len(group_df) == 0:
             return ""
 
@@ -146,23 +146,23 @@ def _build_km_interpretation_context(df, variable_actual):
         mid_followup_survival = float(kmf.predict(mid_followup_time)) if mid_followup_time else final_survival
         max_survival = float(kmf.predict(max_time)) if max_time else final_survival
         km_median = kmf.median_survival_time_
-        median_note = "no alcanzada" if pd.isna(km_median) or km_median == float("inf") else f"{float(km_median):.0f}"
+        median_note = "not reached" if pd.isna(km_median) or km_median == float("inf") else f"{float(km_median):.0f}"
         events = int(group_df['final_result'].sum())
         event_rate = (events / len(group_df)) * 100
 
         return (
-            f"- {label}: n={len(group_df)}, eventos={events} ({event_rate:.1f}%), "
-            f"S(tiempo intermedio observado={mid_followup_time:.0f}) aprox. {mid_followup_survival:.3f}, "
-            f"S(tiempo máximo observado={max_time:.0f}) aprox. {max_survival:.3f}, "
-            f"supervivencia final aprox. {final_survival:.3f}, "
-            f"mediana Kaplan-Meier={median_note}"
+            f"- {label}: n={len(group_df)}, events={events} ({event_rate:.1f}%), "
+            f"S(observed midpoint time={mid_followup_time:.0f}) approx. {mid_followup_survival:.3f}, "
+            f"S(maximum observed time={max_time:.0f}) approx. {max_survival:.3f}, "
+            f"final survival approx. {final_survival:.3f}, "
+            f"Kaplan-Meier median={median_note}"
         )
 
     if len(columns) == 1 and variable_actual != 'studied_credits':
         col = columns[0]
         label_map = {
-            'gender_F': {1: 'Femenino', 0: 'Masculino'},
-            'disability_N': {1: 'Sin discapacidad', 0: 'Con discapacidad'}
+            'gender_F': {1: 'Female', 0: 'Male'},
+            'disability_N': {1: 'Without disability', 0: 'With disability'}
         }
         df_filtered = df[df[col].notnull()]
         for group_value in sorted(df_filtered[col].unique()):
@@ -201,27 +201,27 @@ def _build_km_interpretation_context(df, variable_actual):
             groups = list(df_temp['credits_group'].dropna().unique())
             for group_value in groups:
                 group_df = df_temp[df_temp['credits_group'] == group_value]
-                label = f"Créditos: {group_value}"
+                label = f"Credits: {group_value}"
                 line = _format_group_stats(label, group_df)
                 if line:
                     context_lines.append(line)
 
             if not context_lines and len(unique_values) <= 5:
                 unique_vals = sorted(df_temp['studied_credits'].unique())
-                context_lines.append(f"- Valores de créditos visibles: {', '.join(map(str, unique_vals))}")
+                context_lines.append(f"- Visible credit values: {', '.join(map(str, unique_vals))}")
 
     if context_lines:
         context_lines.append(
-            "Nota para interpretar: S(t) es supervivencia estimada en tiempos observados, no mediana de supervivencia. "
-            "Si la mediana Kaplan-Meier no se alcanza, no afirmes que existe una mediana de supervivencia. "
-            "Compara la proximidad visual de las curvas y trata con cautela curvas con n pequeno o supervivencia final perfecta."
+            "Interpretation note: S(t) is estimated survival at observed times, rather than median survival. "
+            "If the Kaplan-Meier median is not reached, do not claim that a median survival time exists. "
+            "Compare the visual proximity of the curves and be cautious about curves with small n or perfect final survival."
         )
 
     return "\n".join(context_lines)
 
 
-def _build_cox_interpretation_context(summary_df, selected_covariables=None, df=None, language='es'):
-    """Construye un resumen fiel de la tabla Cox activa para el prompt de IA."""
+def _build_cox_interpretation_context(summary_df, selected_covariables=None, df=None, language='en'):
+    """Build an accurate summary of the active Cox table for the AI prompt."""
     if summary_df is None or summary_df.empty:
         return ""
 
@@ -246,14 +246,14 @@ def _build_cox_interpretation_context(summary_df, selected_covariables=None, df=
     }
 
     def _as_float(value):
-        """Convierte un valor numerico de la tabla a float si es posible."""
+        """Convert a numeric table value to float when possible."""
         try:
             return float(value)
         except (TypeError, ValueError):
             return None
 
     def _clean_label(covariable):
-        """Transforma nombres internos de columnas en etiquetas legibles."""
+        """Convert internal column names into readable labels."""
         covariable = str(covariable)
         if covariable in label_map:
             return label_map[covariable]
@@ -264,7 +264,7 @@ def _build_cox_interpretation_context(summary_df, selected_covariables=None, df=
         return _humanize_label(covariable)
 
     def _selected_label(covariable):
-        """Devuelve el nombre visible de la covariable seleccionada."""
+        """Return the display name of the selected covariate."""
         covariable = str(covariable)
         if covariable == 'gender_F':
             return 'Género'
@@ -360,7 +360,7 @@ def _build_cox_interpretation_context(summary_df, selected_covariables=None, df=
 
 
 def _build_logrank_interpretation_context(logrank_store_data):
-    """Convierte tabla y curvas Log-Rank activas en contexto interpretable."""
+    """Convert active Log-Rank tables and curves into interpretable context."""
     if not isinstance(logrank_store_data, dict):
         return ""
 
@@ -368,7 +368,7 @@ def _build_logrank_interpretation_context(logrank_store_data):
     from log_rank_test import COVARIABLE_MAPPING
 
     def _clean_group_label(value, covariable=None):
-        """Normaliza etiquetas de grupos para mostrarlas en la interpretacion."""
+        """Normalize group labels for display in the interpretation."""
         text = str(value)
         if covariable == 'gender_F':
             return {'0': 'Masculino', '1': 'Femenino'}.get(text, text)
@@ -385,7 +385,7 @@ def _build_logrank_interpretation_context(logrank_store_data):
         return _humanize_label(text)
 
     def _selected_label(covariable):
-        """Obtiene el nombre descriptivo de la covariable usada en Log-Rank."""
+        """Get the descriptive name of the covariate used in Log-Rank."""
         labels = {
             'gender_F': 'Género',
             'disability_N': 'Discapacidad',
@@ -396,7 +396,7 @@ def _build_logrank_interpretation_context(logrank_store_data):
         return labels.get(str(covariable), _humanize_label(covariable))
 
     def _format_group_stats(label, group_df):
-        """Resume tamano, eventos y supervivencia final de un grupo."""
+        """Summarize a group's size, events, and final survival."""
         if group_df is None or len(group_df) == 0:
             return ""
 
@@ -408,7 +408,7 @@ def _build_logrank_interpretation_context(logrank_store_data):
         return f"{label}: n={len(group_df)}, eventos={events} ({event_rate:.1f}%), supervivencia final aprox. {final_survival:.3f}"
 
     def _build_curve_context(df, covariable):
-        """Construye las lineas de contexto de curvas para la explicacion IA."""
+        """Build curve context lines for the AI explanation."""
         if df is None or df.empty or 'date' not in df.columns or 'final_result' not in df.columns:
             return []
 
@@ -456,14 +456,14 @@ def _build_logrank_interpretation_context(logrank_store_data):
 
     result_blocks = []
 
-    # Formato heredado: {'results_json': '...'}
+    # Legacy format: {'results_json': '...'}
     if logrank_store_data.get('results_json'):
         result_blocks.append({
             'covariable': logrank_store_data.get('covariable', ''),
             'results_json': logrank_store_data.get('results_json')
         })
 
-    # Formato actual: {'results': [{'results_json': '...'}, ...]}
+    # Current format: {'results': [{'results_json': '...'}, ...]}
     for item in logrank_store_data.get('results', []) or []:
         if isinstance(item, dict) and item.get('results_json'):
             result_blocks.append(item)
@@ -526,8 +526,8 @@ def _build_logrank_interpretation_context(logrank_store_data):
     return "\n".join(lines)
 
 
-def _build_weibull_interpretation_context(analysis, df=None, language='es'):
-    """Resume la tabla y grafica Weibull activas para el prompt de IA."""
+def _build_weibull_interpretation_context(analysis, df=None, language='en'):
+    """Summarize the active Weibull table and chart for the AI prompt."""
     if not analysis or not isinstance(analysis, dict):
         return ""
 
@@ -599,8 +599,8 @@ def _build_weibull_interpretation_context(analysis, df=None, language='es'):
     return "\n".join(lines)
 
 
-def _build_exponential_interpretation_context(analysis, df=None, language='es'):
-    """Resume la tabla y grafica exponencial activas para el prompt de IA."""
+def _build_exponential_interpretation_context(analysis, df=None, language='en'):
+    """Summarize the active Exponential table and chart for the AI prompt."""
     if not analysis or not isinstance(analysis, dict):
         return ""
 
@@ -659,8 +659,8 @@ def _build_exponential_interpretation_context(analysis, df=None, language='es'):
     return "\n".join(lines)
 
 
-def _build_rsf_interpretation_context(rsf_store_data, profile_store_data=None, language='es'):
-    """Resume las graficas, tabla e indicador de perfil activos de RSF."""
+def _build_rsf_interpretation_context(rsf_store_data, profile_store_data=None, language='en'):
+    """Summarize the active RSF charts, table, and profile indicator."""
     if not isinstance(rsf_store_data, dict):
         return ""
 
@@ -739,8 +739,8 @@ def _build_rsf_interpretation_context(rsf_store_data, profile_store_data=None, l
     return "\n".join(lines)
 
 
-def _interpretation_style_guidance(language='es'):
-    """Instruccion comun para que la IA interprete en vez de copiar tablas."""
+def _interpretation_style_guidance(language='en'):
+    """Shared instruction for AI to interpret results instead of copying tables."""
     if language == 'en':
         return (
             "Do not rewrite the table row by row. Start with the main conclusion suggested by the data, "
@@ -763,9 +763,9 @@ def _interpretation_style_guidance(language='es'):
 
 
 
-# Página de HOME - como función para usar traducciones dinámicamente
-def create_home_page(language='es'):
-    """Construye la pagina inicial con video, carga de CSV y boton de preprocesado."""
+# HOME page function supporting dynamic translations.
+def create_home_page(language='en'):
+    """Build the home page with a video, CSV upload, and preprocessing button."""
     return html.Div([
         html.Div([ 
             html.Video(
@@ -816,27 +816,27 @@ def create_home_page(language='es'):
         ], style={'padding': '10px 0 30px 0'}),
     ])
 
-# Página inicial
+# Home page.
 home_page = create_home_page('es')
-#ocultar frase incial: "Cargar Dataset..."
+# Hide the initial "Load Dataset..." text.
 
 def register_analysis_callbacks(app):
-    """Registra todos los callbacks de Dash que conectan la interfaz con los analisis."""
+    """Register all Dash callbacks connecting the interface to the analyses."""
     @app.callback(
-        Output('upload-text', 'style'),  # Cambiar el estilo del texto
+        Output('upload-text', 'style'),  # Change the text style.
         [Input('upload-data', 'contents')],
         prevent_initial_call=True
     )
     def hide_upload_text(contents):
-        # Si se ha cargado un archivo, ocultamos el texto
-        """Oculta el texto inicial de carga cuando el usuario ya ha subido un archivo."""
+        # Hide the text once a file has been uploaded.
+        """Hide the initial upload text once the user has uploaded a file."""
         if contents is not None:
-            return {'display': 'none'}  # Ocultar el texto
+            return {'display': 'none'}  # Hide the text.
         return {'display': 'block'} 
     
-    # Función para procesar el archivo cargado y mostrarlo en una tabla
-    def display_data(df, title, language='es'):
-        """Monta una tabla Dash para previsualizar el dataframe cargado."""
+    # Process the uploaded file and display it in a table.
+    def display_data(df, title, language='en'):
+        """Build a Dash table to preview the uploaded dataframe."""
         preview_df = df.head(DATASET_PREVIEW_MAX_ROWS).copy() if df is not None else pd.DataFrame()
         return html.Div([
             html.H5(title),
@@ -866,37 +866,37 @@ def register_analysis_callbacks(app):
                 ),
             ], className='dataset-preview-table'),
         ], className='dataset-preview')
-    # Función para cargar el archivo CSV
+    # Load the CSV file.
     def parse_contents(contents, filename=None, preview_only=False):
         """
-        Decodifica y carga un archivo CSV desde un upload de Dash.
-        Intenta automáticamente detecatar el separador correcto.
-        
+        Decode and load a CSV file from a Dash upload.
+        Try to detect the correct delimiter automatically.
+
         Args:
-            contents: String codificado en base64 del archivo
-            
+            contents: Base64-encoded file contents.
+
         Returns:
-            DataFrame con los datos cargados
-            
+            DataFrame containing the uploaded data.
+
         Raises:
-            ValueError: Si no se puede procesar el archivo
+            ValueError: If the file cannot be processed.
         """
         if filename == "temp_data.csv" and TEMP_DATA_PATH.exists():
             try:
                 nrows = DATASET_PREVIEW_MAX_ROWS if preview_only else None
                 return pd.read_csv(TEMP_DATA_PATH, sep=';', nrows=nrows)
             except Exception as disk_error:
-                print(f"⚠️  No se pudo leer temp_data.csv desde disco: {disk_error}")
+                print(f"""⚠️  Could not read temp_data.csv from disk: {disk_error}""")
 
         try:
             if not isinstance(contents, str) or ',' not in contents:
-                raise ValueError("El contenido recibido por Dash está vacío o incompleto.")
+                raise ValueError("The contents received by Dash are empty or incomplete.")
 
             content_type, content_string = contents.split(',')
             try:
                 decoded = base64.b64decode(content_string)
             except MemoryError:
-                raise ValueError("El archivo es grande y no se pudo decodificar en memoria.")
+                raise ValueError("The file is too large to decode in memory.")
 
             best_candidate = None
             read_errors = []
@@ -909,10 +909,10 @@ def register_analysis_callbacks(app):
                             best_candidate = df_candidate
                         if len(df_candidate.columns) > 1:
                             if separator == ',':
-                                print("⚠️  Advertencia: Se detectó separador ',' en lugar de ';'")
+                                print("⚠️  Warning: Detected ',' as the delimiter instead of ';'")
                             return df_candidate
                     except UnicodeDecodeError:
-                        read_errors.append(f"{encoding}/{separator}: codificación no válida")
+                        read_errors.append(f"{encoding}/{separator}: invalid encoding")
                         continue
                     except Exception as read_error:
                         read_errors.append(f"{encoding}/{separator}: {read_error}")
@@ -922,24 +922,24 @@ def register_analysis_callbacks(app):
                 return best_candidate
 
             details = "; ".join(read_errors[:3])
-            raise ValueError(f"No se pudo leer el CSV. Verifica el formato, separador y codificación. {details}")
+            raise ValueError(f"""Could not read the CSV. Check its format, delimiter, and encoding. {details}""")
                     
         except Exception as e:
-            raise ValueError(f"Error procesando el archivo: {str(e)}")
+            raise ValueError(f"""Error processing the file: {str(e)}""")
     
     def verificar_archivo_correcto(contents, filename):
-        # Compara el nombre del archivo cargado con el archivo esperado
-        """Comprueba que el archivo subido coincide con el nombre esperado por la aplicacion."""
+        # Compare the uploaded filename with the expected filename.
+        """Check that the uploaded filename matches the application's expected name."""
         archivo_esperado = "temp_data.csv"
         
-        # Verificar si el nombre del archivo cargado es el esperado
+        # Check whether the uploaded filename matches the expected name.
         if filename != archivo_esperado:
             return False
         return True
     
     
-    def validate_uploaded_csv(df, filename, language='es'):
-        """Valida estructura mínima del CSV antes de preprocesar."""
+    def validate_uploaded_csv(df, filename, language='en'):
+        """Validate the minimum CSV structure before preprocessing."""
         errors = []
     
         if not filename or not str(filename).lower().endswith('.csv'):
@@ -1024,7 +1024,7 @@ def register_analysis_callbacks(app):
         return errors
     
     
-    # Función para actualizar la página y mostrar el archivo cargado
+    # Update the page and display the uploaded file.
     @app.callback(
         [Output('upload-data', 'style'),
          Output('load-clean', 'style'), 
@@ -1039,7 +1039,7 @@ def register_analysis_callbacks(app):
     )
     
     def update_output(contents, filename, n_clicks, language, current_df_json):
-        """Gestiona la carga/preprocesado del CSV y actualiza los stores usados por el dashboard."""
+        """Handle CSV upload/preprocessing and update the dashboard stores."""
         try:
             if language not in ['es', 'en']:
                 language = 'es'
@@ -1047,7 +1047,7 @@ def register_analysis_callbacks(app):
             safe_clicks = n_clicks or 0
     
             if contents is None:
-                # Si ya hay un dataset preprocesado en memoria, mantenerlo sin forzar recarga
+                # Keep an already preprocessed dataset in memory without forcing a reload.
                 if current_df_json is not None:
                     try:
                         df_cached = _read_split_json(current_df_json)
@@ -1059,7 +1059,7 @@ def register_analysis_callbacks(app):
                             _dataset_signature_from_json(current_df_json),
                         )
                     except Exception:
-                        # Si falla la reconstrucción, limpiar estado corrupto de forma segura
+                        # Safely clear corrupted state if reconstruction fails.
                         return (
                             {'display': 'block'},
                             {'display': 'none'},
@@ -1109,7 +1109,7 @@ def register_analysis_callbacks(app):
                         }
                     ), None, ''
     
-            # Cargar el archivo CSV con manejo de errores
+            # Load the CSV file with error handling.
             try:
                 df = parse_contents(contents, filename, preview_only=safe_clicks <= 0)
             except Exception as e:
@@ -1157,7 +1157,7 @@ def register_analysis_callbacks(app):
                 ), None, ''
     
             if safe_clicks > 0:
-                # Ejecutar el preprocesamiento con manejo de errores
+                # Run preprocessing with error handling.
                 try:
                     df_procesado = preprocess_data(df)
                     processed_json = df_procesado.to_json(date_format='iso', orient='split')
@@ -1208,11 +1208,11 @@ def register_analysis_callbacks(app):
                         }
                     ), None, ''
     
-            # Si no se ha presionado el botón de limpiar, mostrar el archivo bruto
+            # Display the raw file if the preprocessing button has not been clicked.
             return {'display': 'none'}, {'display': 'inline-block'}, display_data(df, get_translation(language, 'archivo_bruto'), language), None, ''
     
         except Exception as e:
-            print(f"[UPDATE_OUTPUT] Error no controlado: {e}")
+            print(f"""[UPDATE_OUTPUT] Unhandled error: {e}""")
             return (
                 {'display': 'block'},
                 {'display': 'none'},
@@ -1225,18 +1225,18 @@ def register_analysis_callbacks(app):
             )
     
     
-    #maneja que no aparezca la barra de navegacion hasta que se limpie el dataset
+    # Hide the navigation bar until the dataset has been cleaned.
     @app.callback(
         Output('navbar', 'style'),
         [Input('df-store', 'data')]
     )
     def toggle_navbar(df_json):
-        """Muestra la navegacion solo cuando ya existe un dataset disponible."""
+        """Show navigation only when a dataset is available."""
         if df_json is not None:
             return {'position': 'fixed', 'top': '0', 'left': '0', 'width': '100%', 'background-color': '#f4f7f6', 'padding': '10px', 'z-index': '1000'}
-        return {'display': 'none'}  # Si no se ha presionado el botón, la barra de navegación permanece oculta
+        return {'display': 'none'}  # Keep the navigation bar hidden until the button has been clicked.
     
-    #maneja navegacion de kaplan
+    # Handle Kaplan-Meier navigation.
     @app.callback(
         [Output('km-cov-div', 'children'),
          Output('km-current-variable', 'data')],
@@ -1248,55 +1248,55 @@ def register_analysis_callbacks(app):
         prevent_initial_call=True
     )
     def update_km_cov(gender_clicks, disability_clicks, age_clicks, edu_clicks, credits_clicks, none_clicks, df_json, language):
-        """Determina que covariable Kaplan-Meier se selecciono y devuelve su grafica."""
+        """Determine which Kaplan-Meier covariate was selected and return its chart."""
         try:
             ctx = callback_context
             if not ctx.triggered:
                 return None, ''
             
-            # Si no hay datos cargados, usar el dataset limpio local solo como fallback.
+            # If no data is loaded, use the local clean dataset only as a fallback.
             if df_json is None:
                 load_dataframes()
                 if df_limpio is None:
                     raise PreventUpdate
                 df = df_limpio.copy()
             else:
-                # Reconstruir el dataframe desde el JSON
+                # Rebuild the dataframe from JSON.
                 df = _read_split_json(df_json)
             
             button_id = ctx.triggered[0]['prop_id'].split('.')[0]
             
             if button_id == 'botonG':
                 from kaplan_meier import plot_km_by_covariate_with_figure
-                graph_component, _ = plot_km_by_covariate_with_figure(df, 'gender_F')
+                graph_component, _ = plot_km_by_covariate_with_figure(df, 'gender_F', language=language)
                 return html.Div([
                     html.H3("Kaplan-Meier Curve by Gender"if language == 'en'else "Curva de Kaplan-Meier por Género", style={'textAlign': 'center', 'color': '#0d0d0d', 'fontWeight': 'bold', 'marginBottom': '20px'}),
                     graph_component
                 ]), 'gender_F'
             elif button_id == 'botonDisc':
                 from kaplan_meier import plot_km_by_covariate_with_figure
-                graph_component, _ = plot_km_by_covariate_with_figure(df, 'disability_N')
+                graph_component, _ = plot_km_by_covariate_with_figure(df, 'disability_N', language=language)
                 return html.Div([
                     html.H3("Kaplan-Meier Curve by Disability"if language == 'en'else "Curva de Kaplan-Meier por Discapacidad", style={'textAlign': 'center', 'color': '#0d0d0d', 'fontWeight': 'bold', 'marginBottom': '20px'}),
                     graph_component
                 ]), 'disability_N'
             elif button_id == 'botonAge':
                 from kaplan_meier import plot_km_by_covariate_with_figure
-                graph_component, _ = plot_km_by_covariate_with_figure(df, 'age_band')
+                graph_component, _ = plot_km_by_covariate_with_figure(df, 'age_band', language=language)
                 return html.Div([
                     html.H3("Kaplan-Meier Curve by Age Band"if language == 'en'else "Curva de Kaplan-Meier por Banda de Edad", style={'textAlign': 'center', 'color': '#0d0d0d', 'fontWeight': 'bold', 'marginBottom': '20px'}),
                     graph_component
                 ]), 'age_band'
             elif button_id == 'botonEdu':
                 from kaplan_meier import plot_km_by_covariate_with_figure
-                graph_component, _ = plot_km_by_covariate_with_figure(df, 'highest_education')
+                graph_component, _ = plot_km_by_covariate_with_figure(df, 'highest_education', language=language)
                 return html.Div([
                     html.H3("Kaplan-Meier Curve by Highest Education"if language == 'en'else "Curva de Kaplan-Meier por Educación Más Alta", style={'textAlign': 'center', 'color': '#0d0d0d', 'fontWeight': 'bold', 'marginBottom': '20px'}),
                     graph_component
                 ]), 'highest_education'
             elif button_id == 'botonCredits':
                 from kaplan_meier import plot_km_by_covariate_with_figure
-                graph_component, _ = plot_km_by_covariate_with_figure(df, 'studied_credits')
+                graph_component, _ = plot_km_by_covariate_with_figure(df, 'studied_credits', language=language)
                 return html.Div([
                     html.H3("Kaplan-Meier Curve by Studied Credits"if language == 'en'else "Curva de Kaplan-Meier por Créditos Estudiados", style={'textAlign': 'center', 'color': '#0d0d0d', 'fontWeight': 'bold', 'marginBottom': '20px'}),
                     graph_component
@@ -1304,16 +1304,16 @@ def register_analysis_callbacks(app):
             elif button_id == 'botonNone':
                 return None, ''
             
-            # Por si acaso no se detecta ningún botón
+            # Fallback if no button is detected.
             return None, ''
         
         except Exception as e:
-            # Manejo de errores en Kaplan-Meier
+            # Handle Kaplan-Meier errors.
             import traceback
             error_div = html.Div([
-                html.H3("❌ Error en Kaplan-Meier", style={'color': '#d32f2f', 'fontWeight': 'bold'}),
-                html.P(f"No se pudo generar la gráfica: {str(e)}", style={'color': '#1a1a1a'}),
-                html.Div(f"Detalles técnicos: {traceback.format_exc()}", style={'fontSize': '12px', 'color': '#666', 'whiteSpace': 'pre-wrap', 'marginTop': '10px'})
+                html.H3("❌ Error in Kaplan-Meier", style={'color': '#d32f2f', 'fontWeight': 'bold'}),
+                html.P(f"Could not generate the chart: {str(e)}", style={'color': '#1a1a1a'}),
+                html.Div(f"Technical details: {traceback.format_exc()}", style={'fontSize': '12px', 'color': '#666', 'whiteSpace': 'pre-wrap', 'marginTop': '10px'})
             ])
             return error_div, '' 
     
@@ -1328,7 +1328,7 @@ def register_analysis_callbacks(app):
         prevent_initial_call=True 
     )
     def explicar_kaplan(n_clicks, variable_actual, language, df_json):
-        """Callback para generar explicación de la gráfica Kaplan-Meier con datos reales"""
+        """Generate an explanation of the Kaplan-Meier chart using actual data."""
         try:
             if n_clicks is None or n_clicks <= 0:
                 return ""
@@ -1339,14 +1339,14 @@ def register_analysis_callbacks(app):
             if language not in ['es', 'en']:
                 language = 'es'
             
-            # Extraer estadísticas reales de la variable KM
+            # Extract actual statistics for the KM variable.
             stats_info = ""
             if df_json:
                 try:
                     df = _read_split_json(df_json)
                     stats_info = _build_km_interpretation_context(df, variable_actual)
                 except Exception as e:
-                    print(f"Error extrayendo estadísticas KM: {e}")
+                    print(f"""Error extracting KM statistics: {e}""")
 
             if not stats_info.strip():
                 return (
@@ -1355,7 +1355,7 @@ def register_analysis_callbacks(app):
                     else "⚠️  No se pudieron extraer datos numéricos de la gráfica Kaplan-Meier actual."
                 )
             
-            # Construir prompt con datos reales
+            # Build a prompt using actual data.
             if language == 'en':
                 prompt = f"""Write an academic interpretation of the Kaplan-Meier graph currently displayed for '{_humanize_label(variable_actual)}'. Use only the real group results below and do not discuss variables that are not visible in this graph:
     {stats_info}
@@ -1373,10 +1373,10 @@ def register_analysis_callbacks(app):
         except requests.exceptions.Timeout:
             return f"⚠️  {get_translation(language, 'error_timeout')}"
         except Exception as e:
-            print(f"❌ Error en explicar_kaplan: {str(e)}")
+            print(f"""❌ Error in explicar_kaplan: {str(e)}""")
             return f"❌ Error: {str(e)}"
     
-    # Callback para actualizar el gráfico según la selección del Dropdown
+    # Update the chart according to the Dropdown selection.
     @app.callback(
         [Output('covariables-graph', 'figure'),
         Output('graph-explanation', 'children')],
@@ -1386,8 +1386,8 @@ def register_analysis_callbacks(app):
         prevent_initial_call=False
     )
     def update_graph(col_chosen, language, df_json):
-        # VALIDACIÓN 1: Leer el dataset desde el store
-        """Actualiza la visualizacion Kaplan-Meier segun la covariable elegida."""
+        # VALIDATION 1: Read the dataset from the store.
+        """Update the Kaplan-Meier visualization for the selected covariate."""
         df_data = None
         if df_json:
             try:
@@ -1395,7 +1395,7 @@ def register_analysis_callbacks(app):
             except:
                 df_data = None
         
-        # VALIDACIÓN 2: Verificar que el dataset está cargado y no está vacío
+        # VALIDATION 2: Check that the dataset is loaded and is not empty.
         if df_data is None or df_data.empty:
             error_fig = go.Figure()
             error_fig.add_annotation(
@@ -1409,12 +1409,12 @@ def register_analysis_callbacks(app):
                 html.P(get_translation(language, 'covariate_error_data_body'))
             ])
         
-        # VALIDACIÓN 2: Verificar que language es válido
+        # VALIDATION 2: Check that language is valid.
         if language not in ['es', 'en']:
             language = 'es'
     
         def _pick_existing(df_local, candidates):
-            """Devuelve la primera columna candidata que existe en el dataframe."""
+            """Return the first candidate column present in the dataframe."""
             for col in candidates:
                 if col in df_local.columns:
                     return col
@@ -1440,7 +1440,7 @@ def register_analysis_callbacks(app):
                 return fig, get_translation(language, 'exp_abandono')
             
             elif col_chosen == 'gender':
-                # Soporta datasets con columna original ('gender') o one-hot ('gender_F')
+                # Support datasets with the original column ('gender') or one-hot column ('gender_F').
                 if 'gender' in df_data.columns:
                     plot_df = df_data.copy()
                     plot_df['gender_plot'] = plot_df['gender']
@@ -1463,13 +1463,13 @@ def register_analysis_callbacks(app):
                 return fig, get_translation(language, 'exp_genero')
             
             elif col_chosen == 'disability':
-                # Soporta datasets con columna original ('disability') o one-hot ('disability_N')
+                # Support datasets with the original column ('disability') or one-hot column ('disability_N').
                 if 'disability' in df_data.columns:
                     plot_df = df_data.copy()
                     plot_df['disability_plot'] = plot_df['disability']
                 elif 'disability_N' in df_data.columns:
                     plot_df = df_data.copy()
-                    # disability_N=1 -> sin discapacidad ; disability_N=0 -> con discapacidad
+                    # disability_N=1 -> no disability; disability_N=0 -> disability.
                     plot_df['disability_plot'] = plot_df['disability_N'].apply(
                         lambda x: get_translation(language, 'sin_discapacidad') if x == 1 else get_translation(language, 'con_discapacidad')
                     )
@@ -1523,7 +1523,7 @@ def register_analysis_callbacks(app):
                 ]
                 available_edu = [(col, label) for col, label in education_candidates if col in df_data.columns]
                 if not available_edu:
-                    # Fallback: intentar columna categórica original
+                    # Fallback: try the original categorical column.
                     edu_col = _pick_existing(df_data, ['highest_education', 'education'])
                     if edu_col is None:
                         raise KeyError('highest_education_* / highest_education')
@@ -1562,12 +1562,12 @@ def register_analysis_callbacks(app):
                     raise KeyError('studied_credits')
                 df_credits = df_data[['studied_credits', 'final_result']].copy()
                 
-                # ERROR #6: Validación de quintiles - verificar que hay datos suficientes
+                # ERROR #6: Validate quintiles by checking that there is enough data.
                 unique_values = df_credits['studied_credits'].nunique()
                 if unique_values < 5:
-                    # Si hay menos de 5 valores únicos, usar menos grupos
+                    # Use fewer groups if there are fewer than 5 unique values.
                     num_groups = max(2, unique_values)
-                    print(f"⚠️  [STUDIED_CREDITS] Solo {unique_values} valores únicos, usando {num_groups} grupos")
+                    print(f"""⚠️  [STUDIED_CREDITS] Only {unique_values} unique values; using {num_groups} groups""")
                     df_credits['credits_quintile'] = pd.qcut(df_credits['studied_credits'], q=num_groups, duplicates='drop', labels=False)
                 else:
                     df_credits['credits_quintile'] = pd.qcut(df_credits['studied_credits'], q=5, duplicates='drop', labels=False)
@@ -1596,7 +1596,7 @@ def register_analysis_callbacks(app):
                 return go.Figure(), ""
         
         except KeyError as ke:
-            # ERROR 2: Si falta una columna esperada
+            # ERROR 2: An expected column is missing.
             error_fig = go.Figure()
             error_fig.add_annotation(
                 text=f"{get_translation(language, 'covariate_error_missing_prefix')} '{str(ke)}'",
@@ -1610,7 +1610,7 @@ def register_analysis_callbacks(app):
             ])
         
         except Exception as e:
-            # ERROR 2: Cualquier otro error
+            # ERROR 2: Any other error.
             error_fig = go.Figure()
             error_fig.add_annotation(text=f"❌ Error: {str(e)[:40]}...", showarrow=False, font=dict(size=12, color='red'))
             error_fig.update_layout(title=get_translation(language, 'covariate_error_generic_title'), template="plotly_white")
@@ -1624,7 +1624,7 @@ def register_analysis_callbacks(app):
         Input('covariables-dropdown-cox', 'value')
     )
     def update_cox_store(covariables):
-        """Guarda la seleccion actual de covariables para la regresion de Cox."""
+        """Save the current covariate selection for Cox regression."""
         return covariables if covariables else []
     
     @app.callback(
@@ -1636,30 +1636,30 @@ def register_analysis_callbacks(app):
          Input('dataset-signature-store', 'data')]
     )
     def update_cox_model(covariables, language, df_json, dataset_signature):
-        """Ejecuta la regresion de Cox con las covariables seleccionadas y prepara sus resultados."""
+        """Run Cox regression with the selected covariates and prepare the results."""
         if covariables is None or len(covariables) == 0:
             return None, ''
         
         if df_json is None:
             return None, ''
     
-        # Reconstruir el dataframe desde el JSON
+        # Rebuild the dataframe from JSON.
         df_data = _read_split_json(df_json)
         
-        print(f"\n[UPDATE COX] Columnas disponibles en df_data: {list(df_data.columns)}")
-        print(f"[UPDATE COX] Shape del dataframe: {df_data.shape}")
+        print(f"""\n[UPDATE COX] Available columns in df_data: {list(df_data.columns)}""")
+        print(f"""[UPDATE COX] Dataframe shape: {df_data.shape}""")
     
-        # Asegurarnos de que covariables sea una lista
+        # Ensure covariables is a list.
         if isinstance(covariables, str):  
             covariables = [covariables]
             
-        # Llamamos a la función de regresión de Cox con las covariables seleccionadas
+        # Call Cox regression with the selected covariates.
         summary, cox_table_html = run_cox_regression(df_data, covariables)
         
-        print(f"[UPDATE COX] Summary vacío: {summary.empty}")
+        print(f"""[UPDATE COX] Summary empty: {summary.empty}""")
         print(f"[UPDATE COX] cox_table_html: {type(cox_table_html)}")
         
-        # Guardar datos en formato JSON-serializable para el Store
+        # Save data in a JSON-serializable format for the Store.
         store_data = {
             'summary_json': summary.to_json(orient='split') if not summary.empty else None,
             'cox_table_html': cox_table_html,
@@ -1667,10 +1667,10 @@ def register_analysis_callbacks(app):
             'dataset_signature': dataset_signature or ''
         }
         
-        # Guardar las variables seleccionadas como string para la explicación
+        # Save the selected variables as a string for the explanation.
         variables_str = ', '.join(covariables) if isinstance(covariables, list) else covariables
         
-        print(f"[UPDATE COX] Guardando en Store: {store_data.keys()}")
+        print(f"""[UPDATE COX] Saving to Store: {store_data.keys()}""")
         return store_data, variables_str
     
     
@@ -1680,7 +1680,7 @@ def register_analysis_callbacks(app):
          Input('language-store', 'data')]
     )
     def render_cox_output(store_data, language):
-        """Renderiza tabla y gráfica de Cox desde el Store"""
+        """Render the Cox table and chart from the Store."""
         if store_data is None:
             return html.Div([
                 html.Br(),
@@ -1690,15 +1690,15 @@ def register_analysis_callbacks(app):
         try:
             output_elements = []
             
-            # Recrear tabla desde el summary guardado en el Store
+            # Rebuild the table from the summary saved in the Store.
             if store_data.get('summary_json'):
                 try:
                     summary = _read_split_json(store_data['summary_json'])
                     if not summary.empty:
                         cox_table = dash_table.DataTable(
                             id='cox-summary-table',
-                            columns=[{"name": col, "id": col} for col in summary.columns],
-                            data=summary.to_dict('records'),
+                            columns=[{"name": get_display_text(language, col), "id": col} for col in summary.columns],
+                            data=get_display_records(summary, language),
                             style_table={
                                 'height': '300px',
                                 'overflowY': 'auto',  
@@ -1715,11 +1715,11 @@ def register_analysis_callbacks(app):
                             style_header={'fontWeight': 'bold', 'backgroundColor': '#f4f7f6'},
                         )
                         output_elements.append(cox_table)
-                        print(f"[RENDER COX] Tabla creada exitosamente: {summary.shape}")
+                        print(f"""[RENDER COX] Table created successfully: {summary.shape}""")
                 except Exception as e:
-                    print(f"[RENDER COX] Error recreando tabla: {e}")
+                    print(f"""[RENDER COX] Error rebuilding table: {e}""")
             
-            # Recrear y mostrar gráfica si tenemos summary
+            # Rebuild and display the chart if a summary is available.
             if store_data.get('summary_json'):
                 try:
                     summary = _read_split_json(store_data['summary_json'])
@@ -1730,16 +1730,16 @@ def register_analysis_callbacks(app):
                             language=language
                         )
                         output_elements.append(forest_plot)
-                        print(f"[RENDER COX] Forest plot creado exitosamente")
+                        print(f"""[RENDER COX] Forest plot created successfully""")
                 except Exception as e:
-                    print(f"[RENDER COX] Error recreando forest plot: {e}")
+                    print(f"""[RENDER COX] Error rebuilding forest plot: {e}""")
                     import traceback
                     traceback.print_exc()
             
             if not output_elements:
                 return html.Div("No results to display" if language == 'en' else "No hay resultados para mostrar")
             
-            print(f"[RENDER COX] Renderizando {len(output_elements)} elementos")
+            print(f"""[RENDER COX] Rendering {len(output_elements)} elements""")
             return html.Div(output_elements, style={'textAlign': 'center', 'marginTop': '20px'})
         
         except Exception as e:
@@ -1756,12 +1756,12 @@ def register_analysis_callbacks(app):
         [Input('language-store', 'data'), Input('df-store', 'data'), Input('url', 'pathname')]
     )
     def render_weibull_output(language, df_json, pathname):
-        """Calcula y renderiza el analisis Weibull cuando hay datos cargados."""
+        """Compute and render Weibull analysis when data is loaded."""
         if pathname != '/survival-analysis/weibull':
             raise PreventUpdate
     
         def _no_data_message():
-            """Construye el mensaje mostrado cuando Weibull no tiene datos suficientes."""
+            """Build the message displayed when Weibull has insufficient data."""
             return html.Div(
                 get_translation(language, 'weibull_no_data'),
                 style={'textAlign': 'center', 'color': '#b03a2e', 'fontWeight': 'bold', 'padding': '20px'}
@@ -1860,12 +1860,12 @@ def register_analysis_callbacks(app):
         [Input('language-store', 'data'), Input('df-store', 'data'), Input('url', 'pathname')]
     )
     def render_exponential_output(language, df_json, pathname):
-        """Calcula y renderiza el analisis exponencial cuando hay datos cargados."""
+        """Compute and render Exponential analysis when data is loaded."""
         if pathname != '/survival-analysis/exponential':
             raise PreventUpdate
     
         def _no_data_message():
-            """Construye el mensaje mostrado cuando Exponencial no tiene datos suficientes."""
+            """Build the message displayed when Exponential has insufficient data."""
             return html.Div(
                 get_translation(language, 'exponential_no_data'),
                 style={'textAlign': 'center', 'color': '#b03a2e', 'fontWeight': 'bold', 'padding': '20px'}
@@ -1966,12 +1966,12 @@ def register_analysis_callbacks(app):
         [Input('language-store', 'data'), Input('df-store', 'data'), Input('url', 'pathname')]
     )
     def render_rsf_output(language, df_json, pathname):
-        """Calcula y renderiza el modelo Random Survival Forest en el panel correspondiente."""
+        """Compute and render the Random Survival Forest model in its panel."""
         if pathname != '/survival-analysis/rsf':
             raise PreventUpdate
     
         def _no_data_message():
-            """Construye el mensaje mostrado cuando RSF no tiene datos suficientes."""
+            """Build the message displayed when RSF has insufficient data."""
             return html.Div(
                 get_translation(language, 'rsf_no_data'),
                 style={'textAlign': 'center', 'color': '#b03a2e', 'fontWeight': 'bold', 'padding': '20px'}
@@ -2069,7 +2069,7 @@ def register_analysis_callbacks(app):
         prevent_initial_call=False
     )
     def simulate_rsf_profile(n_clicks, df_json, gender, disability, age_band, education, credits_level, language):
-        """Simula la supervivencia de un perfil concreto usando el modelo RSF."""
+        """Simulate survival for a specific profile using the RSF model."""
         if not df_json:
             return html.Div(
                 get_translation(language, 'rsf_no_data'),
@@ -2183,7 +2183,7 @@ def register_analysis_callbacks(app):
         prevent_initial_call=True
     )
     def explicar_rsf(n_clicks, rsf_store_data, rsf_profile_data, language):
-        """Genera una interpretacion textual del resultado Random Survival Forest."""
+        """Generate a textual interpretation of the Random Survival Forest results."""
         if n_clicks is None or n_clicks <= 0:
             return get_translation(language, 'respuesta')
     
@@ -2249,7 +2249,7 @@ def register_analysis_callbacks(app):
         prevent_initial_call=True
     )
     def explicar_weibull(n_clicks, df_json, language):
-        """Genera una interpretacion textual del ajuste Weibull actual."""
+        """Generate a textual interpretation of the current Weibull fit."""
         if n_clicks is None or n_clicks <= 0:
             return "", "", ""
     
@@ -2265,7 +2265,7 @@ def register_analysis_callbacks(app):
                 return no_data_msg, "", ""
     
             def _fallback_weibull_explanation():
-                """Crea una explicacion local de Weibull si la IA no devuelve respuesta."""
+                """Create a local Weibull explanation if AI returns no response."""
                 shape = analysis['shape']
                 scale = analysis['scale']
                 median = analysis['median_survival']
@@ -2321,7 +2321,7 @@ def register_analysis_callbacks(app):
             final_text = respuesta if respuesta else _fallback_weibull_explanation()
             return final_text, final_text, language
         except Exception as e:
-            print(f"❌ Error en explicar_weibull: {str(e)}")
+            print(f"""❌ Error in explicar_weibull: {str(e)}""")
             error_msg = get_translation(language, 'weibull_no_data')
             return error_msg, "", ""
     
@@ -2335,7 +2335,7 @@ def register_analysis_callbacks(app):
         prevent_initial_call=True
     )
     def explicar_exponential(n_clicks, df_json, language):
-        """Genera una interpretacion textual del modelo exponencial actual."""
+        """Generate a textual interpretation of the current Exponential model."""
         if n_clicks is None or n_clicks <= 0:
             return "", "", ""
     
@@ -2384,7 +2384,7 @@ def register_analysis_callbacks(app):
             final_text = respuesta if respuesta else analysis['interpretation']
             return final_text, final_text, language
         except Exception as e:
-            print(f"❌ Error en explicar_exponential: {str(e)}")
+            print(f"""❌ Error in explicar_exponential: {str(e)}""")
             error_msg = get_translation(language, 'exponential_no_data')
             return error_msg, "", ""
     
@@ -2399,7 +2399,7 @@ def register_analysis_callbacks(app):
         prevent_initial_call=True
     )
     def explicar_cox(n_clicks, cox_store_data, variables_seleccionadas, df_json, language, dataset_signature):
-        """Callback para generar explicación de Cox Regression con datos reales"""
+        """Generate a Cox regression explanation using actual data."""
         try:
             if n_clicks is None or n_clicks <= 0:
                 return ""
@@ -2440,7 +2440,7 @@ def register_analysis_callbacks(app):
                     else "⚠️  No se pudieron extraer datos numéricos del modelo Cox actual."
                 )
             
-            # Construir prompt con datos reales
+            # Build a prompt using actual data.
             if language == 'en':
                 prompt = (f"Write an academic interpretation of the Cox regression model currently displayed for {_humanize_label(variables_seleccionadas)}. "
                          f"Use only this real table summary and do not discuss covariates that are not in the active model:\n{table_summary}\n"
@@ -2464,17 +2464,17 @@ def register_analysis_callbacks(app):
         except requests.exceptions.Timeout:
             return f"⚠️  {get_translation(language, 'error_timeout')}"
         except Exception as e:
-            print(f"❌ Error en explicar_cox: {str(e)}")
+            print(f"""❌ Error in explicar_cox: {str(e)}""")
             return f"❌ Error: {str(e)}"
-            return f"❌ Error al generar explicación: {str(e)}" 
+            return f"❌ Error generating explanation: {str(e)}"
     
-    #callback para el control del analisis de log rank
+    # Callback controlling Log-Rank analysis.
     @app.callback(
         Output('logrank-selected-covariables', 'data'),
         Input('covariables-dropdown-logrank', 'value')
     )
     def update_logrank_store(covariables):
-        """Guarda las covariables seleccionadas para el Test Log-Rank."""
+        """Save the selected covariates for the Log-Rank test."""
         return covariables if covariables else []
     
     @app.callback(
@@ -2487,35 +2487,35 @@ def register_analysis_callbacks(app):
     )
     
     def update_logrank_test(covariables, language, df_json, dataset_signature):
-        # Verificar que al menos se haya seleccionado una covariable
-        """Ejecuta el Test Log-Rank para cada covariable y guarda tablas y graficas."""
+        # Check that at least one covariate has been selected.
+        """Run the Log-Rank test for each covariate and save tables and charts."""
         if not covariables:
             return None, ''
         
         if df_json is None:
             return None, ''
     
-        # Reconstruir el dataframe desde el JSON
+        # Rebuild the dataframe from JSON.
         df_data = _read_split_json(df_json)
         
-        print(f"\n[UPDATE LOGRANK] Covariables seleccionadas: {covariables}")
-        print(f"[UPDATE LOGRANK] Shape del dataframe: {df_data.shape}")
+        print(f"""\n[UPDATE LOGRANK] Selected covariates: {covariables}""")
+        print(f"""[UPDATE LOGRANK] Dataframe shape: {df_data.shape}""")
     
         panels = []
         results_payload = []
     
-        # Ejecutar el Test de Log-Rank para cada covariable seleccionada
+        # Run the Log-Rank test for each selected covariate.
         for covariable in covariables:
-            print(f"\n[UPDATE LOGRANK] Procesando covariable: {covariable}")
+            print(f"""\n[UPDATE LOGRANK] Processing covariate: {covariable}""")
             try:
                 res_df = perform_log_rank_test(df_data, covariable)
-                print(f"[UPDATE LOGRANK] Resultado para {covariable}: {len(res_df)} filas")
+                print(f"""[UPDATE LOGRANK] Result for {covariable}: {len(res_df)} rows""")
                 if res_df.empty:
-                    print(f"[WARNING LOGRANK] res_df vacío para {covariable}")
+                    print(f"""[WARNING LOGRANK] Empty res_df for {covariable}""")
                     continue
                 
-                # Crear panel con tabla de resultados del test y gráfica Kaplan-Meier estratificada
-                table = display_logrank_summary_table(res_df)
+                # Create a panel with the test results table and stratified Kaplan-Meier chart.
+                table = display_logrank_summary_table(res_df, language=language)
                 graph_component = plot_logrank_curves(df_data, covariable, language=language)
     
                 results_payload.append({
@@ -2532,11 +2532,11 @@ def register_analysis_callbacks(app):
     
                     
             except Exception as e:
-                print(f"[ERROR LOGRANK] Error procesando {covariable}: {str(e)}")
+                print(f"""[ERROR LOGRANK] Error processing {covariable}: {str(e)}""")
                 import traceback
                 traceback.print_exc()
         
-        # Guardar datos estructurados para la explicación y para renderizar la vista
+        # Save structured data for the explanation and view rendering.
         variables_str = ', '.join(covariables) if isinstance(covariables, list) else covariables
         store_data = {
             'df_json': df_json,
@@ -2556,7 +2556,7 @@ def register_analysis_callbacks(app):
         State('dataset-signature-store', 'data')]  
     )
     def explicar_logrank(n_clicks, logrank_content, variables_seleccionadas, language, dataset_signature):
-        """Callback para generar explicación de Log-Rank Test con datos reales"""
+        """Generate a Log-Rank test explanation using actual data."""
         try:
             if n_clicks is None or n_clicks <= 0:
                 return ""
@@ -2574,7 +2574,7 @@ def register_analysis_callbacks(app):
             if language not in ['es', 'en']:
                 language = 'es'
             
-            # Formatear datos del store (limitar para prompt conciso)
+            # Format store data, limiting its size to keep the prompt concise.
             logrank_data_str = _build_logrank_interpretation_context(logrank_content)
 
             if not logrank_data_str.strip():
@@ -2584,7 +2584,7 @@ def register_analysis_callbacks(app):
                     else "⚠️  No se pudieron extraer datos numéricos del resultado Log-Rank actual."
                 )
             
-            # Construir prompt con datos reales
+            # Build a prompt using actual data.
             if language == 'en':
                 prompt = (f"Write an academic interpretation of the Log-Rank result currently displayed for {_humanize_label(variables_seleccionadas)}. "
                          f"Use only the active table and curve summaries below:\n"
@@ -2612,17 +2612,17 @@ def register_analysis_callbacks(app):
         except requests.exceptions.Timeout:
             return f"⚠️  {get_translation(language, 'error_timeout')}"
         except Exception as e:
-            print(f"❌ Error en explicar_logrank: {str(e)}")
+            print(f"""❌ Error in explicar_logrank: {str(e)}""")
             return f"❌ Error: {str(e)}"
     
-    # Callbacks para sincronizar stores con divs en las páginas
+    # Synchronize stores with divs on the pages.
     @app.callback(
         Output('logrank-test-output', 'children'),
         [Input('logrank-test-output-store', 'data'),
          Input('language-store', 'data')]
     )
     def sync_logrank_output(data, language):
-        """Reconstruye la salida visual del Log-Rank a partir de los datos guardados."""
+        """Rebuild the Log-Rank visual output from the stored data."""
         if not data or not isinstance(data, dict):
             return data
     
@@ -2645,7 +2645,7 @@ def register_analysis_callbacks(app):
                 res_df = _read_split_json(results_json)
                 if res_df.empty:
                     continue
-                table = display_logrank_summary_table(res_df)
+                table = display_logrank_summary_table(res_df, language=language)
                 graph_component = plot_logrank_curves(df_data, covariable, language=language)
                 panels.append(html.Div([
                     html.H3(
@@ -2658,7 +2658,7 @@ def register_analysis_callbacks(app):
     
             return html.Div(panels) if panels else html.Div("No results to display" if language == 'en' else "No hay resultados para mostrar")
         except Exception as e:
-            print(f"[SYNC LOGRANK] Error reconstruyendo salida: {e}")
+            print(f"""[SYNC LOGRANK] Error rebuilding output: {e}""")
             return html.Div(
                 f"Error rendering results: {str(e)}" if language == 'en' else f"Error renderizando resultados: {str(e)}"
             )

@@ -1,73 +1,73 @@
-# Guia de documentacion del TFG
+# Final degree project documentation guide
 
-Esta carpeta contiene la plantilla LaTeX extraida de `ALFONSO.zip` y preparada para documentar el TFG:
+This folder contains the LaTeX template extracted from `ALFONSO.zip` and prepared for documenting the final degree project:
 
-- Archivo principal: `__memoria.tex`
-- Datos de portada: `Configuracion/_datos_proyecto.tex`
-- Capitulos: `Unidades/*/info.tex`
-- Bibliografia: `referencias.bib`
-- Manual anexo: `Unidades/Apéndice/manual_de_usuario.tex`
+- Main file: `__memoria.tex`
+- Cover information: `Configuracion/_datos_proyecto.tex`
+- Chapters: `Unidades/*/info.tex`
+- Bibliography: `referencias.bib`
+- User manual appendix: `Unidades/Apéndice/manual_de_usuario.tex`
 
-## Datos del anteproyecto que deben mantenerse
+## Project proposal information to retain
 
-- Titulo: Ampliacion y mejora de un Dashboard interactivo para el analisis de supervivencia aplicado al abandono escolar universitario.
-- Autor: Alfonso Munoz Cuesta.
-- Director: Dr. Juan Alfonso Lara Torralbo.
-- Universidad: Universidad de Cordoba, Escuela Politecnica Superior de Cordoba.
-- Grado: Ingenieria Informatica.
-- Tipo de TFG: analisis y resolucion de casos practicos reales en el ambito de la ingenieria.
-- Linea: analisis, diseno y desarrollo de aplicaciones web.
+- Title: Extending and improving an interactive dashboard for survival analysis of university student dropout.
+- Author: Alfonso Munoz Cuesta.
+- Supervisor: Dr. Juan Alfonso Lara Torralbo.
+- University: Universidad de Cordoba, Escuela Politecnica Superior de Cordoba.
+- Degree: Computer Engineering.
+- Project type: analysis and resolution of real practical cases in engineering.
+- Subject area: analysis, design, and development of web applications.
 
-## Objetivos obligatorios
+## Required objectives
 
-La memoria debe demostrar que se han cubierto estos puntos:
+The report must demonstrate coverage of the following points:
 
-- Mejora del modulo de inteligencia artificial para generar interpretaciones con mayor rapidez.
-- Soporte multilingue, al menos castellano e ingles.
-- Incorporacion o tratamiento de nuevas variables, incluyendo variables no binarias cuando proceda.
-- Graficos y analisis comparativos basados en Log-Rank y Cox.
-- Integracion de nuevas tecnicas de analisis de supervivencia: Weibull, Exponencial y Random Survival Forest, o equivalentes justificados.
-- Exportacion automatica de informes, graficos o resultados.
+- Improve the artificial intelligence module to generate interpretations faster.
+- Provide multilingual support, including at least Spanish and English.
+- Incorporate or handle new variables, including nonbinary variables where appropriate.
+- Provide comparative charts and analyses based on Log-Rank and Cox.
+- Integrate new survival analysis techniques: Weibull, Exponential, and Random Survival Forest, or justified equivalents.
+- Export reports, charts, or results automatically.
 
-## Estructura esperada de la memoria
+## Expected report structure
 
-El anteproyecto pide cubrir, como minimo:
+The project proposal requires at least:
 
-- Introduccion y motivacion.
-- Objetivos generales y especificos.
-- Antecedentes y relacion con el TFG previo.
-- Marco teorico sobre analisis de supervivencia y abandono universitario.
-- Metodologia: datos, preprocesamiento, modelos, IA, multilingue y exportacion.
-- Resultados y mejoras implementadas.
-- Desarrollo tecnico de la aplicacion.
-- Discusion, limitaciones y conclusiones.
-- Bibliografia.
-- Anexos con manual de usuario, codigo, capturas y material complementario.
+- Introduction and motivation.
+- General and specific objectives.
+- Background and relationship to the previous final degree project.
+- Theoretical framework for survival analysis and university dropout.
+- Methodology: data, preprocessing, models, AI, multilingual support, and export.
+- Results and implemented improvements.
+- Technical development of the application.
+- Discussion, limitations, and conclusions.
+- Bibliography.
+- Appendices with the user manual, code, screenshots, and supplementary material.
 
-## Planificacion del anteproyecto
+## Project proposal schedule
 
-La estimacion total es de 300 horas:
+The estimated total is 300 hours:
 
-| Fase | Horas |
+| Phase | Hours |
 | --- | ---: |
-| Preparacion | 30 |
-| Analisis y diseno | 60 |
-| Desarrollo e implementacion | 120 |
-| Pruebas y validacion | 50 |
-| Documentacion y manuales | 25 |
-| Evaluacion final y conclusiones | 15 |
+| Preparation | 30 |
+| Analysis and design | 60 |
+| Development and implementation | 120 |
+| Testing and validation | 50 |
+| Documentation and manuals | 25 |
+| Final evaluation and conclusions | 15 |
 
-## Estado inicial detectado
+## Initial state identified
 
-- La plantilla ya contiene texto avanzado en introduccion, objetivos, antecedentes, recursos, requisitos y analisis.
-- Los capitulos de marco teorico, restricciones, diseno, implementacion, pruebas y conclusiones necesitan desarrollo.
-- `__memoria.tex` se ha corregido para incluir `Unidades/11-Implementación/info.tex`, que estaba fuera por un `\input` incompleto.
-- `anteproyecto_extract.txt` contiene el texto extraido del PDF para consultar requisitos y bibliografia de partida.
+- The template already contains substantial text in the introduction, objectives, background, resources, requirements, and analysis chapters.
+- The theoretical framework, constraints, design, implementation, testing, and conclusions chapters require further development.
+- `__memoria.tex` was corrected to include `Unidades/11-Implementación/info.tex`, which was omitted because of an incomplete `\input`.
+- `anteproyecto_extract.txt` contains text extracted from the PDF for reference to the original requirements and bibliography.
 
-## Siguiente trabajo recomendado
+## Recommended next steps
 
-1. Revisar y completar el marco teorico con las tecnicas reales del proyecto: Kaplan-Meier, Cox, Log-Rank, Weibull, Exponencial y Random Survival Forest.
-2. Documentar la arquitectura real del codigo usando los modulos del repositorio (`cargaDataset.py`, `layout.py`, `analysis_callbacks.py`, `pdf_exporter.py`, etc.).
-3. Pasar el manual de usuario existente de `doc/MANUAL DE USUARIO.pdf` al anexo de la memoria o resumirlo en LaTeX.
-4. Depurar `referencias.bib`, porque contiene referencias heredadas no relacionadas con este TFG.
-5. Anadir capturas reales de la aplicacion y resultados exportados cuando la parte funcional este cerrada.
+1. Review and complete the theoretical framework using the project's actual techniques: Kaplan-Meier, Cox, Log-Rank, Weibull, Exponential, and Random Survival Forest.
+2. Document the actual code architecture using the repository modules (`cargaDataset.py`, `layout.py`, `analysis_callbacks.py`, `pdf_exporter.py`, etc.).
+3. Move the existing user manual from `doc/MANUAL DE USUARIO.pdf` into the report appendix, or summarize it in LaTeX.
+4. Clean up `referencias.bib`, which contains inherited references unrelated to this project.
+5. Add actual application screenshots and exported results when the functionality is complete.

@@ -328,7 +328,7 @@ textarea[data-dash-is-loading="true"] + .textarea-loading-message {
     overflow-y: hidden;
 }
 
-/* Home: bloque central formal (sin tocar banner ni navbar) */
+/* Home: formal central block, preserving the banner and navbar. */
 .home-main-panel {
     max-width: 980px;
     margin: 18px auto 0 auto;
@@ -448,7 +448,7 @@ textarea[data-dash-is-loading="true"] + .textarea-loading-message {
     padding: 14px 18px;
 }
 
-/* El selector de idioma mantiene su estilo original definido en el layout */
+/* The language selector retains its original style defined in the layout. */
 
 @media (max-width: 980px) {
     .navbar-links {

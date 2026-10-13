@@ -1,17 +1,18 @@
-"""Modelo de regresion de Cox y visualizacion asociada.
+"""Cox regression model and associated visualization.
 
-Contiene la preparacion de covariables, el ajuste con lifelines y la creacion
-de tablas/forest plots que se muestran en el dashboard.
+Prepare covariates, fit the model with lifelines, and create
+the tables and forest plots displayed in the dashboard.
 """
 
 from lifelines import CoxPHFitter
 import numpy as np
 import pandas as pd
 from dash import dash_table
+from translations import get_display_text
 import plotly.graph_objects as go
 
-# Mapeo entre nombres usados por la interfaz y columnas reales del dataset.
-# Las variables categoricas one-hot se expanden a varias columnas.
+# Map interface names to actual dataset columns.
+# Expand one-hot categorical variables into multiple columns.
 COVARIABLE_MAPPING = {
     'gender_F': ['gender_F'],
     'disability_N': ['disability_N'],
@@ -25,41 +26,41 @@ COVARIABLE_MAPPING = {
 
 def run_cox_regression(df_limpio, covariables):
     """
-    Ejecuta regresión de Cox con las covariables seleccionadas.
-    Maneja tanto parámetros simples como compuestos (age_band, highest_education).
-    Remueve una columna de referencia para cada variable categórica (one-hot encoded).
-    
+    Run Cox regression with the selected covariates.
+    Handle both simple and composite parameters (age_band, highest_education).
+    Remove a reference column for each one-hot encoded categorical variable.
+
     Args:
-        df_limpio: DataFrame con los datos
-        covariables: Lista de nombres de covariables (ej: ['gender_F', 'age_band', 'studied_credits'])
-    
+        df_limpio: DataFrame containing the data.
+        covariables: Covariate names, e.g. ['gender_F', 'age_band', 'studied_credits'].
+
     Returns:
-        summary: DataFrame con el resumen del modelo
-        cox_table_html: Tabla HTML para mostrar
-        
+        summary: DataFrame containing the model summary.
+        cox_table_html: HTML table for display.
+
     Raises:
-        ValueError: Si los datos no son válidos
+        ValueError: If the data is invalid.
     """
     
     try:
-        # VALIDACIÓN 0: Verificar inputs básicos
+        # VALIDATION 0: Check basic inputs.
         if df_limpio is None or len(df_limpio) == 0:
-            raise ValueError("❌ DataFrame vacío - No hay datos para regresión de Cox")
+            raise ValueError("❌ Empty DataFrame - No data for Cox regression")
         
         if not covariables or len(covariables) == 0:
-            raise ValueError("❌ No se seleccionó ninguna covariable")
+            raise ValueError("❌ No covariates selected")
         
-        # VALIDACIÓN 1: Verificar columnas críticas
+        # VALIDATION 1: Check critical columns.
         columnas_criticas = ['date', 'final_result']
         faltantes = [col for col in columnas_criticas if col not in df_limpio.columns]
         if faltantes:
-            raise ValueError(f"❌ Falta columnas críticas: {', '.join(faltantes)}")
+            raise ValueError(f"""❌ Missing critical columns: {', '.join(faltantes)}""")
         
-        # Suprimir warnings de lifelines sobre convergencia
+        # Suppress lifelines convergence warnings.
         import warnings
         warnings.filterwarnings('ignore', category=Warning)
         
-        # Expandir los parámetros compuestos a sus columnas reales
+        # Expand composite parameters into their actual columns.
         columnas_finales = ['date', 'final_result']
         for cov in covariables:
             if cov in COVARIABLE_MAPPING:
@@ -67,30 +68,30 @@ def run_cox_regression(df_limpio, covariables):
             else:
                 columnas_finales.append(cov)
         
-        # Remover duplicados mientras mantenemos el orden
+        # Remove duplicates while preserving order.
         columnas_finales = list(dict.fromkeys(columnas_finales))
         
-        # Verificar que todas las columnas existan en el DataFrame
+        # Check that all columns exist in the DataFrame.
         columnas_validas = [col for col in columnas_finales if col in df_limpio.columns]
         
-        print(f"[DEBUG Cox] Covariables solicitadas: {covariables}")
-        print(f"[DEBUG Cox] Columnas válidas encontradas: {columnas_validas}")
+        print(f"""[DEBUG Cox] Requested covariates: {covariables}""")
+        print(f"""[DEBUG Cox] Valid columns found: {columnas_validas}""")
         
-        # Preparamos el DataFrame para la regresión de Cox
+        # Prepare the DataFrame for Cox regression.
         df_cox = df_limpio[columnas_validas].copy()
         
-        # Remover filas con valores faltantes
+        # Remove rows with missing values.
         df_cox = df_cox.dropna()
         
         if df_cox.empty:
-            print("[DEBUG Cox] DataFrame vacío después de dropna()")
+            print("[DEBUG Cox] Empty DataFrame after dropna()")
             return pd.DataFrame(), None
         
-        # Para variables one-hot encoded (categóricas), remover la última columna para evitar colinealidad perfecta
+        # Remove the last one-hot categorical column to avoid perfect collinearity.
         cov_cols = [col for col in columnas_validas if col not in ['date', 'final_result']]
         
-        # Identificar grupos one-hot. En Cox no se pueden meter todas las
-        # categorias a la vez porque producirian colinealidad perfecta.
+        # Identify one-hot groups. Cox cannot include all
+        # categories at once because this would cause perfect collinearity.
         columnas_por_grupo = {}
         for col in cov_cols:
             if '_' in col:
@@ -109,7 +110,7 @@ def run_cox_regression(df_limpio, covariables):
                     columnas_por_grupo['simple'] = []
                 columnas_por_grupo['simple'].append(col)
         
-        # Remover la última columna de cada grupo categórico (es la referencia)
+        # Remove the last column of each categorical group as the reference.
         cov_cols_ajustadas = []
         for grupo, cols in columnas_por_grupo.items():
             if grupo == 'simple' or len(cols) == 1:
@@ -117,41 +118,41 @@ def run_cox_regression(df_limpio, covariables):
             else:
                 cols_sin_referencia = cols[:-1]
                 cov_cols_ajustadas.extend(cols_sin_referencia)
-                print(f"[DEBUG Cox] Variable categórica '{grupo}': referencia: {cols[-1]}")
+                print(f"""[DEBUG Cox] Categorical variable '{grupo}': reference: {cols[-1]}""")
         
-        print(f"[DEBUG Cox] Covariables definitivas: {cov_cols_ajustadas}")
+        print(f"""[DEBUG Cox] Final covariates: {cov_cols_ajustadas}""")
         
-        # Preparar DataFrame final
+        # Prepare the final DataFrame.
         df_cox = df_cox[['date', 'final_result'] + cov_cols_ajustadas].copy()
         df_cox = df_cox.dropna()
         
         if df_cox.empty:
-            print("[DEBUG Cox] DataFrame vacío")
+            print("[DEBUG Cox] Empty DataFrame")
             return pd.DataFrame(), None
         
-        # Creamos el objeto CoxPHFitter y ajustamos el modelo
+        # Create the CoxPHFitter object and fit the model.
         cph = CoxPHFitter()
         
-        # Intentar ajustar con todas las variables
+        # Try fitting with all variables.
         try:
             cph.fit(df_cox, duration_col='date', event_col='final_result', show_progress=False)
-            print("[DEBUG Cox] Modelo ajustado correctamente")
+            print("[DEBUG Cox] Model fitted successfully")
         except Exception as e:
-            print(f"[DEBUG Cox] Error inicial: {str(e)}")
-            print(f"[DEBUG Cox] Intentando con regularización...")
+            print(f"""[DEBUG Cox] Initial error: {str(e)}""")
+            print(f"""[DEBUG Cox] Trying regularization...""")
             
             fitted_with_fallback = False
             try:
-                # Intentar con regularización (penalización)
+                # Try regularization (penalization).
                 cph = CoxPHFitter(penalizer=0.1)
                 cph.fit(df_cox, duration_col='date', event_col='final_result', show_progress=False)
                 fitted_with_fallback = True
-                print("[DEBUG Cox] Modelo ajustado con regularización")
+                print("[DEBUG Cox] Model fitted with regularization")
             except Exception as e2:
-                print(f"[DEBUG Cox] Error con regularización: {str(e2)}")
-                print(f"[DEBUG Cox] Removiendo variables problemáticas...")
+                print(f"""[DEBUG Cox] Error with regularization: {str(e2)}""")
+                print(f"""[DEBUG Cox] Removing problematic variables...""")
             
-            # Remover variables problemáticas conocidas una por una
+            # Remove known problematic variables one at a time.
             variables_problematicas = [
                 'age_band_55<=',
                 'disability_N',
@@ -171,7 +172,7 @@ def run_cox_regression(df_limpio, covariables):
                     
                     try:
                         cph.fit(df_cox_temp, duration_col='date', event_col='final_result', show_progress=False)
-                        print(f"[DEBUG Cox] Modelo ajustado sin: {var_problematica}")
+                        print(f"""[DEBUG Cox] Model fitted without: {var_problematica}""")
                         df_cox = df_cox_temp
                         cov_cols_ajustadas = cov_cols_temp
                         exito = True
@@ -180,33 +181,33 @@ def run_cox_regression(df_limpio, covariables):
                         continue
             
             if not fitted_with_fallback and not exito:
-                print("[ERROR Cox] No se pudo ajustar el modelo con ninguna combinación de variables")
-                # Retornar error pero con información
+                print("[ERROR Cox] Could not fit the model with any combination of variables")
+                # Return an error with additional information.
                 error_summary = pd.DataFrame({
                     'Covariable': ['ERROR'],
-                    'Estado': ['Modelo de Cox no convergió. Intenta con más variables o más datos.']
+                    'Estado': ['The Cox model did not converge. Try more variables or more data.']
                 })
                 return error_summary, None
 
-        # Resumen del modelo de Cox
+        # Cox model summary.
         summary = cph.summary.copy()
         
-        # ERROR #4: Validar que tenemos suficientes eventos para el análisis
+        # ERROR #4: Check that there are enough events for the analysis.
         total_events = int(df_cox['final_result'].sum())
         min_events = 5
         if total_events < min_events:
-            print(f"[WARN Cox] Solo {total_events} eventos observados (mínimo recomendado: {min_events})")
-            # Continuar pero con advertencia
+            print(f"""[WARN Cox] Only {total_events} observed events (recommended minimum: {min_events})""")
+            # Continue with a warning.
         
-        # ERROR #4: Validar que no hay problemas con división por cero en el cálculo de p-valores
+        # ERROR #4: Check for division by zero when calculating p-values.
         if summary.empty:
             return pd.DataFrame(), None
         
-        # Manejo seguro de p-valores que pueden ser muy pequeños o indefinidos
-        summary['p'] = summary['p'].fillna(1.0)  # Reemplazar NaN con 1.0 (no significativo)
-        summary['-log2(p)'] = -np.log2(summary['p'].clip(lower=1e-10))  # Evitar log de 0
+        # Safely handle very small or undefined p-values.
+        summary['p'] = summary['p'].fillna(1.0)  # Replace NaN with 1.0 (not significant).
+        summary['-log2(p)'] = -np.log2(summary['p'].clip(lower=1e-10))  # Avoid taking the logarithm of 0.
 
-        # Tabla HTML a partir del resumen del modelo de Cox
+        # Build an HTML table from the Cox model summary.
         cols_mostrar = ['coef', 'exp(coef)', 'se(coef)', 'coef lower 95%', 'coef upper 95%',
                         'exp(coef) lower 95%', 'exp(coef) upper 95%', 'cmp to', 'z', 'p', '-log2(p)']
         summary = summary[[c for c in cols_mostrar if c in summary.columns]]
@@ -215,10 +216,10 @@ def run_cox_regression(df_limpio, covariables):
         summary.columns = ['Covariable', 'Coef.', 'exp(Coef.)', 'SE(Coef.)', 'Coef. lower 95%', 'Coef. upper 95%',
                            'exp(Coef.) lower 95%', 'exp(Coef.) upper 95%', 'cmp to', 'z', 'p', '-log2(p)']
 
-        # Crear el DataTable
+        # Create the DataTable.
         cox_table_html = dash_table.DataTable(
             id='cox-summary-table',
-            columns=[{"name": col, "id": col} for col in summary.columns],
+            columns=[{"name": get_display_text("en", col), "id": col} for col in summary.columns],
             data=summary.to_dict('records'),
             style_table={
                 'height': '300px',
@@ -239,7 +240,7 @@ def run_cox_regression(df_limpio, covariables):
             ]
         )
 
-        # Retornar tanto el resumen como la tabla HTML
+        # Return both the summary and the HTML table.
         return summary, cox_table_html
     
     except Exception as e:
@@ -249,27 +250,28 @@ def run_cox_regression(df_limpio, covariables):
 
 def create_forest_plot(summary_data):
     """
-    Crea un Forest Plot para visualizar los coeficientes de Cox Regression.
-    
+    Create a forest plot to visualize Cox regression coefficients.
+
     Args:
-        summary_data: DataFrame con el resumen del modelo Cox
-                      Esperado: columnas 'Covariable', 'exp(Coef.)', 'Coef. lower 95%', 'Coef. upper 95%'
-    
+        summary_data: DataFrame containing the Cox model summary.
+            Expected columns: 'Covariable', 'exp(Coef.)',
+            'Coef. lower 95%', and 'Coef. upper 95%'.
+
     Returns:
-        go.Figure: Figura Plotly del Forest Plot, o None si hay error
+        go.Figure: Plotly forest plot, or None on error.
     """
     try:
         if summary_data is None or summary_data.empty:
-            print("[FOREST] No hay datos para crear Forest Plot")
+            print("[FOREST] No data to create a forest plot")
             return None
         
-        # Verificar columnas necesarias
+        # Check the required columns.
         cols_requeridas = ['Covariable', 'exp(Coef.)', 'Coef. lower 95%', 'Coef. upper 95%']
         if not all(col in summary_data.columns for col in cols_requeridas):
-            print(f"[FOREST] Columnas faltantes. Disponibles: {list(summary_data.columns)}")
+            print(f"""[FOREST] Missing columns. Available: {list(summary_data.columns)}""")
             return None
         
-        # Preparar datos y usar HR con intervalos coherentes
+        # Prepare data and use HR with consistent intervals.
         summary_data = summary_data.copy()
         summary_data['HR'] = pd.to_numeric(summary_data['exp(Coef.)'], errors='coerce')
         summary_data['CI_lower'] = pd.to_numeric(summary_data['exp(Coef.) lower 95%'], errors='coerce') if 'exp(Coef.) lower 95%' in summary_data.columns else np.exp(pd.to_numeric(summary_data['Coef. lower 95%'], errors='coerce'))
@@ -277,7 +279,7 @@ def create_forest_plot(summary_data):
         summary_data = summary_data.dropna(subset=['HR', 'CI_lower', 'CI_upper'])
 
         if summary_data.empty:
-            print("[FOREST] No quedan filas válidas tras limpiar datos")
+            print("[FOREST] No valid rows remain after cleaning the data")
             return None
 
         summary_data = summary_data.iloc[::-1].reset_index(drop=True)
@@ -313,7 +315,7 @@ def create_forest_plot(summary_data):
         ))
 
         fig.update_layout(
-            title="Forest Plot - Coeficientes del Modelo Cox",
+            title="Forest Plot - Cox Model Coefficients",
             xaxis_title="Hazard Ratio",
             yaxis_title="Variables",
             height=max(420, 120 + len(summary_data) * 55),
@@ -329,11 +331,11 @@ def create_forest_plot(summary_data):
             xaxis=dict(type='log')
         )
         
-        print(f"[FOREST] Forest Plot creado con {len(summary_data)} variables")
+        print(f"""[FOREST] Forest plot created with {len(summary_data)} variables""")
         return fig
         
     except Exception as e:
-        print(f"[FOREST] Error creando Forest Plot: {e}")
+        print(f"""[FOREST] Error creating forest plot: {e}""")
         import traceback
         traceback.print_exc()
         return None

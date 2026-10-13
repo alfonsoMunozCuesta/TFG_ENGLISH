@@ -1,7 +1,7 @@
-"""Limpieza y reduccion del dataset academico.
+"""Clean and reduce the academic dataset.
 
-Convierte el CSV original en una tabla por estudiante con las columnas que
-necesitan los analisis de supervivencia, validando estructura y valores clave.
+Convert the original CSV into a table with one row per student and the
+columns required for survival analysis, validating structure and key values.
 """
 
 import pandas as pd
@@ -11,14 +11,14 @@ import os
 import csv
 
 def load_dataset(file_path):
-    """Lee el CSV original usando el separador esperado por el proyecto."""
+    """Read the original CSV using the delimiter expected by the project."""
     df = pd.read_csv(file_path, sep=';')
-    df.columns = df.columns.str.strip()  # Elimina espacios en los nombres de las columnas
+    df.columns = df.columns.str.strip()  # Trim whitespace from column names.
     return df
 
-# Función para limpiar las columnas de actividad
+# Clean activity columns.
 def clean_columns(df):
-    """Normaliza nombres de columnas para que sean consistentes en el analisis."""
+    """Normalize column names for consistency in the analysis."""
     columnas_actividad = [
         "ouelluminate", "sharedsubpage", "ouwiki", "folder", "page", "externalquiz",
         "quiz", "dualpane", "questionnaire", "htmlactivity", "oucollaborate",
@@ -27,9 +27,9 @@ def clean_columns(df):
     ]
     return columnas_actividad
 
-# Función para preprocesar el dataset
+# Preprocess the dataset.
 def preprocess_csv_file_streaming(file_path):
-    """Preprocesa temp_data.csv fila a fila para evitar cargar todo el CSV en memoria."""
+    """Preprocess temp_data.csv row by row to avoid loading the entire CSV into memory."""
     columnas_actividad = clean_columns(None)
     columnas_a_conservar = [
         'id_student', 'date', 'final_result',
@@ -43,7 +43,7 @@ def preprocess_csv_file_streaming(file_path):
     columnas_necesarias = set(columnas_a_conservar + columnas_actividad)
 
     def _to_float(value, default=0.0):
-        """Convierte valores del CSV a float y aplica un valor por defecto si fallan."""
+        """Convert CSV values to float, using a default value if conversion fails."""
         try:
             if value is None or str(value).strip() == "":
                 return default
@@ -52,7 +52,7 @@ def preprocess_csv_file_streaming(file_path):
             return default
 
     def _to_int(value, default=0):
-        """Convierte valores del CSV a entero aceptando numeros escritos como decimal."""
+        """Convert CSV values to integers, accepting numbers written as decimals."""
         try:
             if value is None or str(value).strip() == "":
                 return default
@@ -61,7 +61,7 @@ def preprocess_csv_file_streaming(file_path):
             return default
 
     def _normalizar_fila(raw_row):
-        """Elimina espacios en los nombres de columna de una fila leida del CSV."""
+        """Trim column names in a row read from the CSV."""
         return {
             (key.strip() if key else key): value
             for key, value in raw_row.items()
@@ -69,7 +69,7 @@ def preprocess_csv_file_streaming(file_path):
         }
 
     def _preparar_registro(row):
-        """Crea un registro auxiliar con tiempo y evento ya normalizados."""
+        """Create a helper record with normalized time and event values."""
         final_result_text = str(row.get('final_result', '')).strip().lower()
         date_value = _to_float(row.get('date'))
         record = {col: row.get(col, '') for col in columnas_necesarias if col in row}
@@ -78,7 +78,7 @@ def preprocess_csv_file_streaming(file_path):
         return record
 
     def _tiene_actividad(record):
-        """Indica si el registro contiene alguna actividad positiva del estudiante."""
+        """Check whether the record contains any positive student activity."""
         return any(_to_float(record.get(col), 0.0) > 0.0 for col in columnas_actividad)
 
     seleccion_por_estudiante = {}
@@ -88,7 +88,7 @@ def preprocess_csv_file_streaming(file_path):
         fieldnames = {name.strip() for name in (reader.fieldnames or []) if name}
         columnas_faltantes = [col for col in ['id_student', 'date', 'final_result'] if col not in fieldnames]
         if columnas_faltantes:
-            raise ValueError(f"[ERROR] Faltan columnas criticas: {', '.join(columnas_faltantes)}")
+            raise ValueError(f"""[ERROR] Missing critical columns: {', '.join(columnas_faltantes)}""")
 
         for raw_row in reader:
             row = _normalizar_fila(raw_row)
@@ -142,102 +142,102 @@ def preprocess_csv_file_streaming(file_path):
 
     df_final = pd.DataFrame(filas_finales, columns=columnas_a_conservar)
     if df_final.empty:
-        raise ValueError("[ERROR] El dataset esta vacio. No hay filas para procesar.")
+        raise ValueError("[ERROR] The dataset is empty. There are no rows to process.")
 
-    print("\n[OK] Preprocesamiento streaming completado:")
-    print(f"  - Filas procesadas: {df_final.shape[0]}")
-    print(f"  - Columnas conservadas: {df_final.shape[1]}")
-    print(f"  - Distribucion final_result: {df_final['final_result'].value_counts().to_dict()}\n")
+    print("\n[OK] Streaming preprocessing completed:")
+    print(f"""  - Rows processed: {df_final.shape[0]}""")
+    print(f"""  - Columns retained: {df_final.shape[1]}""")
+    print(f"""  - final_result distribution: {df_final['final_result'].value_counts().to_dict()}\n""")
     return df_final
 
 
 def preprocess_data(df_tmp):
     """
-    Preprocesa el dataset eliminando duplicados, conservando columnas esenciales,
-    y validando la integridad de los datos.
-    
+    Preprocess the dataset by removing duplicates, keeping essential columns,
+    and validating data integrity.
+
     Raises:
-        ValueError: Si faltan columnas críticas o el dataframe está vacío
-        TypeError: Si los tipos de datos no son válidos
+        ValueError: If critical columns are missing or the dataframe is empty.
+        TypeError: If data types are invalid.
     """
-    print("Inicio del preprocesamiento de datos...")
+    print("Starting data preprocessing...")
     
-    # VALIDACIÓN 1: DataFrames vacío
+    # VALIDATION 1: Empty DataFrame.
     if df_tmp is None or len(df_tmp) == 0:
-        raise ValueError("[ERROR] El dataset está vacío. No hay filas para procesar.")
+        raise ValueError("[ERROR] The dataset is empty. There are no rows to process.")
     
-    # VALIDACIÓN 2: Columnas críticas
+    # VALIDATION 2: Critical columns.
     columnas_criticas = ['id_student', 'date', 'final_result']
     columnas_faltantes = [col for col in columnas_criticas if col not in df_tmp.columns]
     if columnas_faltantes:
-        raise ValueError(f"[ERROR] Faltan columnas críticas: {', '.join(columnas_faltantes)}")
+        raise ValueError(f"""[ERROR] Missing critical columns: {', '.join(columnas_faltantes)}""")
     
-    print(f"[OK] Validaciones iniciales pasadas")
-    print(f"  - Filas del archivo: {len(df_tmp)}")
-    print(f"  - Columnas encontradas: {len(df_tmp.columns)}")
+    print(f"""[OK] Initial validations passed""")
+    print(f"""  - File rows: {len(df_tmp)}""")
+    print(f"""  - Columns found: {len(df_tmp.columns)}""")
 
     df_tmp.columns = df_tmp.columns.str.strip() 
     
-    # Convertir la columna "final_result" en la columna binaria: 1 = abandono, 0 = no abandono
+    # Convert "final_result" to binary: 1 = dropout, 0 = no dropout.
     try:
         df_tmp['final_result'] = df_tmp['final_result'].astype(str).str.strip().str.lower()
         df_tmp['final_result'] = df_tmp['final_result'].apply(lambda x: 1 if x == 'withdrawn' else 0)
     except Exception as e:
-        raise TypeError(f"[ERROR] No se pudo procesar la columna 'final_result': {str(e)}")
+        raise TypeError(f"""[ERROR] Could not process the 'final_result' column: {str(e)}""")
 
-    # Ordenar por id_student y date en orden descendente (de más reciente a más antigua)
+    # Sort by id_student and date in descending order, newest to oldest.
     df_tmp = df_tmp.sort_values(by=['id_student', 'date'], ascending=[True, False])
 
-    # Eliminar la columna 'Unnamed: 0' si no es necesaria
+    # Remove 'Unnamed: 0' if unnecessary.
     if 'Unnamed: 0' in df_tmp.columns:
         df_tmp = df_tmp.drop(columns=['Unnamed: 0'])
 
-    # Obtener columnas de actividad antes de definir la función
-    # IMPORTANTE: Filtrar solo las columnas que existen en el dataframe
+    # Get activity columns before defining the function.
+    # IMPORTANT: Keep only columns present in the dataframe.
     todas_columnas_actividad = clean_columns(df_tmp)
     columnas_actividad_validas = [col for col in todas_columnas_actividad if col in df_tmp.columns]
 
-    # Función para seleccionar la fila adecuada por estudiante
+    # Select the appropriate row for each student.
     def seleccionar_fila(grupo):
-        """Selecciona la fila final representativa de cada estudiante."""
+        """Select the final representative row for each student."""
         if grupo['final_result'].iloc[0] == 0:
             fila_269 = grupo[grupo['date'] == 269]
             if not fila_269.empty:
                 return fila_269.iloc[0]
             else:
-                return grupo.iloc[0]  # Si no hay date=269, se toma la más reciente
+                return grupo.iloc[0]  # Use the latest row if date=269 is absent.
         else:
-            # Si hay columnas de actividad, buscar fila con actividad
+            # Look for a row with activity if activity columns exist.
             if len(columnas_actividad_validas) > 0:
                 grupo_con_actividad = grupo[(grupo[columnas_actividad_validas] > 0.0).any(axis=1)]
                 if not grupo_con_actividad.empty:
                     return grupo_con_actividad.iloc[0]
-            # Si no tiene actividad o no hay columnas de actividad, tomar fila con date=0
+            # Use the row with date=0 if there is no activity or no activity columns.
             fila_0 = grupo[grupo['date'] == 0]
             if not fila_0.empty:
                 return fila_0.iloc[0]
             else:
                 return grupo.iloc[-1]
 
-    # Eliminar duplicados quedándonos con la fila más reciente por cada id_student
+    # Remove duplicates, keeping the latest row for each id_student.
     df_final = df_tmp.groupby('id_student', group_keys=False).apply(seleccionar_fila)
 
-    # Convertir columnas a int (excepto las de actividad que pueden ser flotantes)
-    # Usar 'Int64' (con I mayúscula) para permitir valores NaN
+    # Convert columns to int, except activity columns that may be floats.
+    # Use 'Int64' with a capital I to allow NaN values.
     for col in df_final.columns:
         if col not in columnas_actividad_validas:
             try:
-                # Intentar convertir a Int64 (nullable integer)
+                # Try converting to Int64 (nullable integer).
                 df_final[col] = pd.to_numeric(df_final[col], errors='coerce').astype('Int64')
             except Exception as e:
-                print(f"Advertencia: No se pudo convertir {col} a int: {e}")
-                # Dejar la columna como está si hay problemas
+                print(f"""Warning: Could not convert {col} to int: {e}""")
+                # Keep the column unchanged if conversion fails.
 
-    # Columnas a conservar: id_student, date, final_result, atributos binarios y nuevos atributos no-binarios
+    # Keep id_student, date, final_result, binary attributes, and new nonbinary attributes.
     columnas_a_conservar = [
         'id_student', 'date', 'final_result', 
         'gender_F', 'disability_N',
-        # Nuevos atributos no-binarios
+        # New nonbinary attributes.
         'age_band_0-35', 'age_band_35-55', 'age_band_55<=',
         'highest_education_A Level or Equivalent', 'highest_education_HE Qualification',
         'highest_education_Lower Than A Level', 'highest_education_No Formal quals',
@@ -245,20 +245,20 @@ def preprocess_data(df_tmp):
         'studied_credits'
     ]
 
-    # VALIDACIÓN 3: Verificar que existen todas las columnas esperadas
+    # VALIDATION 3: Check that all expected columns exist.
     columnas_faltantes = [col for col in columnas_a_conservar if col not in df_final.columns]
     if columnas_faltantes:
-        print(f"[ADVERTENCIA] Faltan columnas esperadas: {', '.join(columnas_faltantes)}")
-        print(f"   Se conservarán solo las columnas disponibles")
+        print(f"""[WARNING] Missing expected columns: {', '.join(columnas_faltantes)}""")
+        print(f"""   Only available columns will be retained""")
         columnas_a_conservar = [col for col in columnas_a_conservar if col in df_final.columns]
     
-    # Verificamos que existen antes de borrarlas
+    # Check that columns exist before dropping them.
     columnas_a_eliminar = [col for col in df_final.columns if col not in columnas_a_conservar]
 
-    # Las borramos
+    # Drop the columns.
     df_final = df_final.drop(columns=columnas_a_eliminar)
 
-    # ERROR #7: Validación de valores NaN en columnas críticas
+    # ERROR #7: Validate NaN values in critical columns.
     critical_cols = ['id_student', 'date', 'final_result']
     nan_en_criticas = []
     for col in critical_cols:
@@ -268,27 +268,27 @@ def preprocess_data(df_tmp):
                 nan_en_criticas.append((col, nan_count))
     
     if nan_en_criticas:
-        print(f"[ADVERTENCIA] Valores NaN en columnas críticas:")
+        print(f"""[WARNING] NaN values in critical columns:""")
         for col, count in nan_en_criticas:
-            print(f"   - {col}: {count} valores NaN")
-        # Remover filas con NaN en columnas críticas
+            print(f"""   - {col}: {count} NaN values""")
+        # Remove rows with NaN in critical columns.
         df_final = df_final.dropna(subset=critical_cols)
-        print(f"   → Filas con NaN removidas. Filas restantes: {df_final.shape[0]}")
+        print(f"""   → Rows with NaN removed. Remaining rows: {df_final.shape[0]}""")
     
-    # [OK] ERROR #7: Reporte de NaN en todas las columnas
+    # [OK] ERROR #7: Report NaN values in all columns.
     nan_summary = df_final.isna().sum()
     if nan_summary.sum() > 0:
-        print(f"\n[ADVERTENCIA] Valores NaN por columna:")
+        print(f"""\n[WARNING] NaN values by column:""")
         for col, count in nan_summary[nan_summary > 0].items():
-            print(f"   - {col}: {count} valores NaN ({count/len(df_final)*100:.1f}%)")
+            print(f"""   - {col}: {count} NaN values ({count/len(df_final)*100:.1f}%)""")
 
-    # LOG: Mostrar resumen de la limpieza realizada
-    print(f"\n[OK] Preprocesamiento completado:")
-    print(f"  - Filas procesadas: {df_final.shape[0]}")
-    print(f"  - Columnas conservadas: {df_final.shape[1]}")
-    print(f"  - Columnas eliminadas: {len(columnas_a_eliminar)}")
-    print(f"  - Distribución final_result: {df_final['final_result'].value_counts().to_dict()}")
-    print(f"  - Columnas de highest_education presentes: {[c for c in df_final.columns if 'highest_education' in c]}")
-    print(f"  - Todas las columnas conservadas: {list(df_final.columns)}\n")
+    # LOG: Display a summary of the cleaning performed.
+    print(f"""\n[OK] Preprocessing completed:""")
+    print(f"""  - Rows processed: {df_final.shape[0]}""")
+    print(f"""  - Columns retained: {df_final.shape[1]}""")
+    print(f"""  - Columns removed: {len(columnas_a_eliminar)}""")
+    print(f"""  - final_result distribution: {df_final['final_result'].value_counts().to_dict()}""")
+    print(f"""  - highest_education columns present: {[c for c in df_final.columns if 'highest_education' in c]}""")
+    print(f"""  - All retained columns: {list(df_final.columns)}\n""")
 
     return df_final

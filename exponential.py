@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from lifelines import KaplanMeierFitter, ExponentialFitter, WeibullFitter
 
 
-def build_exponential_analysis(df: pd.DataFrame, language: str = 'es'):
+def build_exponential_analysis(df: pd.DataFrame, language: str = 'en'):
     """Fit an Exponential model and build the figure and summary table."""
     if df is None or df.empty:
         return None

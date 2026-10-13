@@ -1,7 +1,7 @@
-"""Analisis parametricos Weibull y Exponencial combinado.
+"""Combined Weibull and Exponential parametric analyses.
 
-Prepara los datos de supervivencia, ajusta modelos parametricos con lifelines
-y devuelve figura, resumen e interpretacion para la pagina Weibull.
+Prepare survival data, fit parametric models with lifelines,
+and return the figure, summary, and interpretation for the Weibull page.
 """
 
 import numpy as np
@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from lifelines import KaplanMeierFitter, WeibullFitter, ExponentialFitter
 
 
-def build_weibull_analysis(df, language='es'):
+def build_weibull_analysis(df, language='en'):
     """Fit a Weibull model and build the figure and summary table."""
     if df is None or df.empty:
         return None

@@ -1,11 +1,11 @@
-"""Diccionario bilingue de textos de la interfaz.
+"""Bilingual interface text dictionary.
 
-Mantiene centralizadas las etiquetas en espanol e ingles para que las paginas
-puedan renderizarse dinamicamente segun el idioma activo.
+Centralize Spanish and English labels so pages can render
+dynamically according to the active language.
 """
 
-# Diccionario de traducciones espanol-ingles. Las claves deben coincidir con
-# las usadas en layout.py, cargaDataset.py y los callbacks.
+# Spanish-English translation dictionary. Keys must match
+# those used in layout.py, cargaDataset.py, and callbacks.
 translations = {
     'es': {
         # Navbar
@@ -41,7 +41,7 @@ translations = {
         'pdf_modal_download': 'Descargar PDF',
         'pdf_modal_error_prefix': 'Error',
         
-        # Diálogo de confirmación
+        # Confirmation dialog.
         'confirmar_inicio': '¿Estás seguro de que deseas volver a la página inicial? Perderás el dataset cargado y todo el análisis realizado.',
         
         # Survival Analysis
@@ -97,10 +97,10 @@ translations = {
         'weibull_interpretation': 'Interpretación',
         'weibull_no_data': 'No hay datos suficientes para aplicar Weibull.',
         
-        # Dataset Limpio
+        # Clean dataset.
         'dataset_limpio': 'Dataset Limpio',
         
-        # Análisis de Covariables
+        # Covariate analysis.
         'analisis_covariables_title': 'Análisis de Covariables',
         'analisis_covariables_intro': 'Analiza cómo diferentes variables influyen en el abandono estudiantil',
         'selecciona_el_analisis': 'Selecciona el análisis:',
@@ -151,7 +151,7 @@ translations = {
         'covariate_error_generic_title': 'Error',
         'covariate_error_unexpected_header': '❌ Error inesperado',
         
-        # Gráficos - Titles
+        # Charts: titles.
         'abandono_vs_no_abandono': 'Abandono vs No Abandono',
         'resultado_final': 'Resultado Final',
         'num_estudiantes': 'Número de Estudiantes',
@@ -161,7 +161,7 @@ translations = {
         'abandono_highest_education_title': 'Abandono según Educación Más Alta',
         'evento': 'Evento',
         
-        # Explicaciones
+        # Explanations.
         'exp_abandono': '''Este gráfico muestra la distribución de los estudiantes en función de si han abandonado o no el curso. 
             La columna verde representa a los estudiantes que no han abandonado, mientras que la morada a los que sí.
             Como se puede observar, la mayoría de los estudiantes no han llevado a cabo el evento de abandono 
@@ -243,7 +243,7 @@ translations = {
         'pdf_modal_download': 'Download PDF',
         'pdf_modal_error_prefix': 'Error',
         
-        # Diálogo de confirmación
+        # Confirmation dialog.
         'confirmar_inicio': 'Are you sure you want to return to the home page? You will lose the loaded dataset and all analysis performed.',
         
         # Survival Analysis
@@ -297,6 +297,9 @@ translations = {
         'weibull_value': 'Value',
         'weibull_interpretation': 'Interpretation',
         'weibull_no_data': 'Not enough data is available to apply Weibull.',
+
+        # Clean dataset.
+        'dataset_limpio': 'Clean Dataset',
 
         # Covariate Analysis
         'analisis_covariables_title': 'Covariate Analysis',
@@ -354,7 +357,7 @@ translations = {
         'covariate_error_generic_title': 'Error',
         'covariate_error_unexpected_header': '❌ Unexpected error',
         
-        # Gráficos - Titles
+        # Charts: titles.
         'abandono_vs_no_abandono': 'Dropout vs No Dropout',
         'resultado_final': 'Final Result',
         'num_estudiantes': 'Number of Students',
@@ -362,7 +365,7 @@ translations = {
         'abandono_discapacidad_title': 'Dropout by Disability',
         'evento': 'Event',
         
-        # Explicaciones
+        # Explanations.
         'exp_age_band': '''This chart shows the distribution of dropout by the age band of students. We can observe how the dropout rate
             varies among different age groups. This analysis is important to understand if there is a relationship between student age and the probability
             of dropping out of the course. Most students do not drop out, but it is notable to see if there are significant differences between age groups.''',
@@ -411,26 +414,123 @@ translations = {
     }
 }
 
+def get_display_text(language, text):
+    """Translate display text while preserving internal column and data keys."""
+    if language != 'en' or not isinstance(text, str):
+        return text
+
+    labels = {
+        'Covariable': 'Covariate',
+        'Grupo A': 'Group A',
+        'Grupo B': 'Group B',
+        'Decisión': 'Decision',
+        'Conclusión': 'Conclusion',
+        'Tiempo': 'Time',
+        'Supervivencia': 'Survival',
+        'Metrica': 'Metric',
+        'Métrica': 'Metric',
+        'Valor': 'Value',
+        'Interpretacion': 'Interpretation',
+        'Interpretación': 'Interpretation',
+        'Modelo': 'Model',
+        'Género': 'Gender',
+        'Discapacidad': 'Disability',
+        'Créditos Estudiados': 'Studied Credits',
+        'Postgrado': 'Postgraduate',
+        'Femenino': 'Female',
+        'Masculino': 'Male',
+        'Con discapacidad': 'With disability',
+        'Sin discapacidad': 'Without disability',
+        'Con Discapacidad': 'With Disability',
+        'Sin Discapacidad': 'Without Disability',
+        'Desconocido': 'Unknown',
+        'A Level o Equivalente': 'A Level or Equivalent',
+        'Calificación HE': 'HE Qualification',
+        'Inferior a A Level': 'Lower Than A Level',
+        'Sin Cualificaciones': 'No Formal Qualifications',
+        'Rechazar H0': 'Reject H0',
+        'No rechazar H0': 'Do not reject H0',
+        'No evaluable': 'Not evaluable',
+        'La covariable no tiene exactamente dos grupos.': 'The covariate does not have exactly two groups.',
+        'Hay diferencias significativas entre las curvas': 'There are significant differences between the curves',
+        'No se observan diferencias significativas entre las curvas': 'No significant differences between the curves were observed',
+        'Hay diferencias significativas': 'There are significant differences',
+        'No hay diferencias significativas': 'There are no significant differences',
+        'Curva de Supervivencia Kaplan-Meier': 'Kaplan-Meier Survival Curve',
+        'Probabilidad de Supervivencia': 'Survival Probability',
+        'Tiempo (meses)': 'Time (months)',
+        'Función de Supervivencia': 'Survival Function',
+        'Forest Plot - Coeficientes del Modelo Cox': 'Forest Plot - Cox Model Coefficients',
+        'Sin observaciones en este grupo': 'No observations in this group',
+        'Sin datos': 'No data',
+    }
+    if text in labels:
+        return labels[text]
+
+    fragments = {
+        'Curva de Kaplan-Meier para ': 'Kaplan-Meier Curve for ',
+        'Curvas Kaplan-Meier - ': 'Kaplan-Meier Curves - ',
+        'Grupo vacío: ': 'Empty group: ',
+        'Quintil ': 'Quintile ',
+        'Grupo ': 'Group ',
+        'Créditos: ': 'Credits: ',
+        ' créditos': ' credits',
+        ' años': ' years',
+        ' IC superior': ' upper CI',
+        ' IC inferior': ' lower CI',
+        'Sin observaciones en este grupo': 'No observations in this group',
+        'Sin datos': 'No data',
+        'Tiempo: ': 'Time: ',
+        'Supervivencia: ': 'Survival: ',
+    }
+    for original, translated in fragments.items():
+        text = text.replace(original, translated)
+    return text
+
+
+def get_display_records(dataframe, language):
+    """Translate table cells for display without modifying the source dataframe."""
+    return [
+        {key: get_display_text(language, value) for key, value in row.items()}
+        for row in dataframe.to_dict('records')
+    ]
+
+
+def localize_figure(figure, language):
+    """Translate figure labels without changing traces or numerical results."""
+    if language != 'en':
+        return figure
+    for title in (figure.layout.title, figure.layout.xaxis.title, figure.layout.yaxis.title, figure.layout.legend.title):
+        if title.text:
+            title.text = get_display_text(language, title.text)
+    for trace in figure.data:
+        if trace.name:
+            trace.name = get_display_text(language, trace.name)
+        if getattr(trace, 'hovertemplate', None):
+            trace.hovertemplate = get_display_text(language, trace.hovertemplate)
+    return figure
+
+
 def get_translation(lang, key):
     """
-    Obtiene una traducción basada en el idioma y la clave.
-    
-     ERROR #5: Manejo seguro de traducciones faltantes
-    - Valida que el idioma exista
-    - Retorna clave como fallback si traducción no existe
-    - Loguea advertencias para debugging
+    Get a translation for the specified language and key.
+
+    ERROR #5: Safely handle missing translations.
+    - Validate that the language exists.
+    - Return the key as a fallback if the translation is missing.
+    - Log warnings for debugging.
     """
-    # Validar idioma
+    # Validate the language.
     if lang not in translations:
-        print(f"⚠️  [TRANSLATION] Idioma '{lang}' no soportado, usando 'es'")
+        print(f"""⚠️  [TRANSLATION] Language '{lang}' is unsupported; using 'es'""")
         lang = 'es'
     
-    # Obtener traducción
+    # Get the translation.
     translation = translations.get(lang, {}).get(key, None)
     
-    # Si no existe, retornar la clave como fallback
+    # Return the key as a fallback if the translation does not exist.
     if translation is None:
-        print(f"⚠️  [TRANSLATION] Clave '{key}' no encontrada para idioma '{lang}'")
+        print(f"""⚠️  [TRANSLATION] Key '{key}' not found for language '{lang}'""")
         return key
     
     return translation

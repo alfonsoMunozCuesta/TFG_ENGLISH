@@ -1,8 +1,8 @@
-"""Integracion con el modelo local de IA para explicaciones narrativas.
+"""Integrate the local AI model for narrative explanations.
 
-Construye prompts academicos para cada tecnica de supervivencia, llama al
-servidor local compatible con OpenAI y normaliza la respuesta para mostrarla en
-la aplicacion o incluirla en informes PDF.
+Build academic prompts for each survival technique, call the local
+OpenAI-compatible server, and normalize responses for display
+in the application or inclusion in PDF reports.
 """
 
 import requests
@@ -22,7 +22,7 @@ REQUEST_TIMEOUT_S = 240
 
 
 def _looks_like_list_output(text):
-    """Detecta si la respuesta del modelo parece una lista en vez de prosa."""
+    """Detect whether the model response looks like a list rather than prose."""
     if not text:
         return False
     stripped = text.strip()
@@ -32,7 +32,7 @@ def _looks_like_list_output(text):
 
 
 def _trim_incomplete_final_sentence(text):
-    """Evita mostrar respuestas cortadas a mitad de frase por limite de tokens."""
+    """Avoid displaying responses cut off mid-sentence by the token limit."""
     if not text:
         return text
 
@@ -48,8 +48,8 @@ def _trim_incomplete_final_sentence(text):
     return trimmed or stripped
 
 
-def _academic_system_prompt(language='es'):
-    """Crea el mensaje de sistema que fuerza un tono academico y conciso."""
+def _academic_system_prompt(language='en'):
+    """Create a system message requiring a concise academic tone."""
     if language == 'en':
         return (
             "You are a survival analysis expert writing for an academic thesis on university student dropout. "
@@ -69,8 +69,8 @@ def _academic_system_prompt(language='es'):
     )
 
 
-def _rewrite_to_prose_if_needed(content, max_tokens, language='es', timeout=REQUEST_TIMEOUT_S):
-    """Reescribe respuestas en formato lista para convertirlas en parrafos."""
+def _rewrite_to_prose_if_needed(content, max_tokens, language='en', timeout=REQUEST_TIMEOUT_S):
+    """Rewrite list responses as paragraphs."""
     if not _looks_like_list_output(content):
         return content
 
@@ -98,8 +98,8 @@ def _rewrite_to_prose_if_needed(content, max_tokens, language='es', timeout=REQU
     return rewritten or content
 
 
-def _call_llm(prompt, max_tokens, temperature=DEFAULT_TEMPERATURE, timeout=REQUEST_TIMEOUT_S, language='es'):
-    """Invoca llama-server con parámetros homogéneos y salida académica consistente."""
+def _call_llm(prompt, max_tokens, temperature=DEFAULT_TEMPERATURE, timeout=REQUEST_TIMEOUT_S, language='en'):
+    """Invoke llama-server with consistent parameters and academic output."""
     payload = {
         "model": MODEL_NAME,
         "messages": [
@@ -119,8 +119,8 @@ def _call_llm(prompt, max_tokens, temperature=DEFAULT_TEMPERATURE, timeout=REQUE
     return _trim_incomplete_final_sentence(content)
 
 
-def responder_pregunta_con_llama3(pregunta: str, language: str = 'es') -> str:
-    """Interfaz común para las explicaciones IA solicitadas desde el dashboard."""
+def responder_pregunta_con_llama3(pregunta: str, language: str = 'en') -> str:
+    """Shared interface for AI explanations requested from the dashboard."""
     try:
         return _call_llm(
             pregunta,
@@ -133,24 +133,24 @@ def responder_pregunta_con_llama3(pregunta: str, language: str = 'es') -> str:
     except requests.exceptions.Timeout:
         return ""
     except Exception as e:
-        print(f"Error consultando el modelo IA: {e}")
+        print(f"""Error querying the AI model: {e}""")
         return ""
 
 
-def generate_interpretation_for_pdf(analysis_type, data_summary=None, table_data=None, language='es'):
+def generate_interpretation_for_pdf(analysis_type, data_summary=None, table_data=None, language='en'):
     """
-    Genera interpretaciones automáticas para PDF usando LLM
-    
+    Generate automatic PDF interpretations using an LLM.
+
     Args:
-        analysis_type: 'kaplan-meier', 'cox', 'log-rank'
-        data_summary: dict con estadísticas generales {n_patients, n_events, variable_name}
-        table_data: DataFrame con resultados del análisis
-    
+        analysis_type: 'kaplan-meier', 'cox', or 'log-rank'.
+        data_summary: General statistics {n_patients, n_events, variable_name}.
+        table_data: DataFrame containing analysis results.
+
     Returns:
-        str: Texto de interpretación formateada para PDF
+        str: Interpretation text formatted for PDF.
     """
     
-    # Construir prompt específico según el tipo de análisis
+    # Build a prompt specific to the analysis type.
     if analysis_type == 'kaplan-meier':
         prompt = _build_km_prompt(data_summary, table_data, language)
     elif analysis_type == 'cox':
@@ -165,24 +165,24 @@ def generate_interpretation_for_pdf(analysis_type, data_summary=None, table_data
         return "Could not generate an interpretation for this type of analysis." if language == 'en' else "No se pudo generar interpretación para este tipo de análisis."
     
     try:
-        print(f"⏳ Generando interpretación de IA para {analysis_type}...")
+        print(f"""⏳ Generating an AI interpretation for {analysis_type}...""")
 
         inicio = time.time()
         interpretation = _call_llm(prompt, max_tokens=PDF_MAX_TOKENS, language=language)
         tiempo_respuesta = time.time() - inicio
-        print(f"Interpretación generada en {tiempo_respuesta:.2f}s")
+        print(f"""Interpretation generated in {tiempo_respuesta:.2f}s""")
         
         return interpretation
     
     except requests.exceptions.ConnectionError:
         return ""
     except Exception as e:
-        print(f"❌ Error generando interpretación: {str(e)}")
+        print(f"""❌ Error generating interpretation: {str(e)}""")
         return ""
 
 
-def _build_km_prompt(data_summary, table_data, language='es'):
-    """Construye prompt para Kaplan-Meier"""
+def _build_km_prompt(data_summary, table_data, language='en'):
+    """Build a Kaplan-Meier prompt."""
     data_summary = data_summary or {}
     km_lines = []
     if table_data is not None and isinstance(table_data, pd.DataFrame) and len(table_data) > 0:
@@ -198,9 +198,9 @@ def _build_km_prompt(data_summary, table_data, language='es'):
                 else:
                     km_lines.append(f"- {t_val}")
         except Exception:
-            km_lines.append("- Tabla KM disponible pero no parseable")
+            km_lines.append("- KM table available but could not be parsed")
 
-    km_text = "\n".join(km_lines) if km_lines else "- No hay tabla KM disponible"
+    km_text = "\n".join(km_lines) if km_lines else "- No KM table available"
 
     if language == 'en':
         prompt = f"""
@@ -247,37 +247,37 @@ Devuelve exactamente 3 párrafos cortos:
     return prompt
 
 
-def _build_cox_prompt(data_summary, table_data, language='es'):
-    """Construye prompt para Cox Regression"""
+def _build_cox_prompt(data_summary, table_data, language='en'):
+    """Build a Cox regression prompt."""
     data_summary = data_summary or {}
     
-    # Crear tabla en texto para el prompt
+    # Create a text table for the prompt.
     table_text = ""
     if table_data is not None and isinstance(table_data, pd.DataFrame) and len(table_data) > 0:
         try:
-            # Usar nombres de columnas correctos del modelo Cox
-            # Columnas esperadas: Variable/Covariable, exp(Coef.), Coef. lower 95%, Coef. upper 95%, p
+            # Use the correct Cox model column names.
+            # Expected columns: Variable/Covariable, exp(Coef.), Coef. lower 95%, Coef. upper 95%, p.
             lines = []
             for idx, row in table_data.iterrows():
-                # Obtener el nombre de variable (primer elemento o columna 'Variable'/'Covariable')
+                # Get the variable name from the first element or 'Variable'/'Covariable' column.
                 var_name = row.get('Variable') or row.get('Covariable') or row.iloc[0] if isinstance(row.iloc[0], str) else f"Variable_{idx}"
                 
-                # Obtener HR (exp(Coef.))
+                # Get HR (exp(Coef.)).
                 hr = row.get('exp(Coef.)') or row.get('HR') or 1.0
                 
-                # Obtener IC 95%
+                # Get the 95% CI.
                 ic_lower = row.get('Coef. lower 95%') or 0
                 ic_upper = row.get('Coef. upper 95%') or 0
                 
-                # Obtener p-valor
+                # Get the p-value.
                 p_val = row.get('p') or row.get('p-valor') or 1.0
                 
                 lines.append(f"  - {var_name}: HR={float(hr):.2f} (IC 95%: {float(ic_lower):.2f}-{float(ic_upper):.2f}), p={float(p_val):.4f}")
             
             table_text = "\n".join(lines)
         except Exception as e:
-            print(f"Error procesando tabla Cox para prompt: {e}")
-            table_text = "Tabla de resultados [formato no procesable]"
+            print(f"""Error processing Cox table for the prompt: {e}""")
+            table_text = "Results table [unsupported format]"
     
     if language == 'en':
         prompt = f"""
@@ -320,10 +320,10 @@ Por favor:
     return prompt
 
 
-def _build_logrank_prompt(data_summary, table_data, language='es'):
-    """Construye prompt para Log-Rank Test"""
+def _build_logrank_prompt(data_summary, table_data, language='en'):
+    """Build a Log-Rank test prompt."""
     data_summary = data_summary or {}
-    logrank_text = "- No hay tabla de Log-Rank disponible"
+    logrank_text = "- No Log-Rank table available"
     if table_data is not None and isinstance(table_data, pd.DataFrame) and len(table_data) > 0:
         try:
             rows = []
@@ -334,7 +334,7 @@ def _build_logrank_prompt(data_summary, table_data, language='es'):
                 rows.append(f"- {cov}: chi2={chi2}, p={pval}")
             logrank_text = "\n".join(rows)
         except Exception:
-            logrank_text = "- Tabla de Log-Rank disponible pero no parseable"
+            logrank_text = "- Log-Rank table available but could not be parsed"
 
     if language == 'en':
         prompt = f"""
@@ -375,8 +375,8 @@ Devuelve exactamente 2 párrafos:
     return prompt
 
 
-def _build_weibull_prompt(data_summary, table_data, language='es'):
-    """Construye prompt para Weibull"""
+def _build_weibull_prompt(data_summary, table_data, language='en'):
+    """Build a Weibull prompt."""
     data_summary = data_summary or {}
     table_text = ""
     if table_data is not None and isinstance(table_data, pd.DataFrame) and len(table_data) > 0:
@@ -388,8 +388,8 @@ def _build_weibull_prompt(data_summary, table_data, language='es'):
                 lines.append(f"  - {metric}: {value}")
             table_text = "\n".join(lines)
         except Exception as e:
-            print(f"Error procesando tabla Weibull para prompt: {e}")
-            table_text = "Tabla de resultados [formato no procesable]"
+            print(f"""Error processing Weibull table for the prompt: {e}""")
+            table_text = "Results table [unsupported format]"
 
     if language == 'en':
         prompt = f"""
@@ -431,8 +431,8 @@ Por favor:
     return prompt
 
 
-def _build_exponential_prompt(data_summary, table_data, language='es'):
-    """Construye prompt para Exponential Survival."""
+def _build_exponential_prompt(data_summary, table_data, language='en'):
+    """Build an Exponential survival prompt."""
     data_summary = data_summary or {}
     table_text = ""
     if table_data is not None and isinstance(table_data, pd.DataFrame) and len(table_data) > 0:
@@ -444,9 +444,9 @@ def _build_exponential_prompt(data_summary, table_data, language='es'):
                 lines.append(f"- {metric}: {value}")
             table_text = "\n".join(lines)
         except Exception:
-            table_text = "- Tabla de resultados no parseable"
+            table_text = "- Results table could not be parsed"
     else:
-        table_text = "- No hay tabla de resultados disponible"
+        table_text = "- No results table available"
 
     if language == 'en':
         return f"""
@@ -486,11 +486,11 @@ Devuelve exactamente 3 párrafos cortos:
 """
 
 def _format_context_for_prompt(context_data, max_chars=3500):
-    """Convierte datos de gráfica/tabla en texto compacto para el prompt."""
+    """Convert chart/table data into compact text for the prompt."""
     if context_data is None:
-        return "No se proporcionaron datos numéricos adicionales."
+        return "No additional numerical data was provided."
     if isinstance(context_data, str) and not context_data.strip():
-        return "No se proporcionaron datos numéricos adicionales."
+        return "No additional numerical data was provided."
 
     try:
         if isinstance(context_data, pd.DataFrame):
@@ -510,11 +510,11 @@ def _format_context_for_prompt(context_data, max_chars=3500):
     return text[:max_chars]
 
 
-def generate_explanation(graph_data, model_type, language='es'):
+def generate_explanation(graph_data, model_type, language='en'):
     """
-    Genera explicaciones usando llama.cpp (llama-server) con Qwen2.5-1.5B-Instruct.
-    Endpoint local sin dependencias externas.
-    Usa el timeout configurado para evitar bloquear la interfaz.
+    Generate explanations using llama.cpp (llama-server) with Qwen2.5-1.5B-Instruct.
+    Use a local endpoint without external dependencies.
+    Apply the configured timeout to avoid blocking the interface.
     """
     context_text = _format_context_for_prompt(graph_data)
 
@@ -552,24 +552,24 @@ DATOS:
 Devuelve 2 párrafos académicos breves. Cita valores concretos cuando existan, no inventes valores e incluye una limitación."""
 
     try:
-        # Registro de inicio
+        # Log the start.
         inicio = time.time()
-        print(f"\n⏳ Enviando solicitud al LLM...")
-        print(f"Esperando respuesta...\n")
+        print(f"""\n⏳ Sending request to the LLM...""")
+        print(f"""Waiting for a response...\n""")
         sys.stdout.flush()
         explanation = _call_llm(prompt, max_tokens=EXPLAIN_MAX_TOKENS, timeout=REQUEST_TIMEOUT_S, language=language)
         
-        # Calcular tiempo de respuesta
+        # Calculate response time.
         tiempo_respuesta = time.time() - inicio
         
-        # Mostrar tiempo de procesamiento
+        # Display processing time.
         minutos = int(tiempo_respuesta // 60)
         segundos = int(tiempo_respuesta % 60)
         tiempo_str = f"{minutos}m {segundos}s" if minutos > 0 else f"{segundos}s"
-        print(f"\nRespuesta generada en: {tiempo_str}")
+        print(f"""\nResponse generated in: {tiempo_str}""")
         sys.stdout.flush()
         
-        # Limitar la longitud si es necesario
+        # Limit the length if necessary.
         max_length = 3000
         if len(explanation) > max_length:
             explanation_parts = [explanation[i:i + 1000] for i in range(0, len(explanation), 1000)]
@@ -578,8 +578,8 @@ Devuelve 2 párrafos académicos breves. Cita valores concretos cuando existan, 
         return explanation
         
     except requests.exceptions.ConnectionError:
-        return "❌ Error: No se pudo conectar a llama-server. Asegúrate de que está ejecutándose en http://127.0.0.1:8000"
+        return "❌ Error: Could not connect to llama-server. Make sure it is running at http://127.0.0.1:8000"
     except requests.exceptions.Timeout:
-        return "❌ Error: Timeout (el modelo tardó demasiado en responder, >10 minutos). Intenta con prompts más cortos."
+        return "❌ Error: Timeout (the model took more than 10 minutes to respond). Try shorter prompts."
     except Exception as e:
-        return f"❌ Error al generar explicación: {str(e)}"
+        return f"❌ Error generating explanation: {str(e)}"

@@ -1,15 +1,16 @@
 """
-Funciones para crear gráficas de análisis de supervivencia.
-Incluye gráficas para Log-Rank Test y Cox Regression.
+Functions for creating survival analysis charts.
+Include charts for the Log-Rank test and Cox regression.
 """
 
 import plotly.graph_objs as go
 import pandas as pd
 import numpy as np
 from lifelines import KaplanMeierFitter
+from translations import get_display_text
 from dash import dcc, html
 
-# Mapeo de parámetros a columnas reales
+# Map parameters to actual columns.
 COVARIABLE_MAPPING = {
     'gender_F': ['gender_F'],
     'disability_N': ['disability_N'],
@@ -21,7 +22,7 @@ COVARIABLE_MAPPING = {
     'studied_credits': ['studied_credits']
 }
 
-# Mapeo de labels legibles
+# Map readable labels.
 LABEL_MAPPING = {
     'gender_F': 'Género',
     'disability_N': 'Discapacidad',
@@ -36,16 +37,16 @@ LABEL_MAPPING = {
 }
 
 
-def plot_logrank_curves(df, covariable, language='es'):
+def plot_logrank_curves(df, covariable, language='en'):
     """
-    Crea una gráfica de curvas de supervivencia (Kaplan-Meier) estratificadas por una covariable.
-    
+    Create Kaplan-Meier survival curves stratified by a covariate.
+
     Args:
-        df: DataFrame con los datos
-        covariable: Nombre de la covariable para estratificar
-    
+        df: DataFrame containing the data.
+        covariable: Covariate name used for stratification.
+
     Returns:
-        dcc.Graph con la gráfica de Kaplan-Meier estratificada
+        dcc.Graph containing the stratified Kaplan-Meier chart.
     """
     
     is_en = language == 'en'
@@ -55,11 +56,11 @@ def plot_logrank_curves(df, covariable, language='es'):
     kmf = KaplanMeierFitter()
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
     
-    # Si es variable continua (studied_credits)
+    # Continuous variable (studied_credits).
     if covariable == 'studied_credits':
         df_temp = df[['studied_credits', 'date', 'final_result']].dropna()
         
-        # Crear quintiles
+        # Create quintiles.
         n_unique = df_temp['studied_credits'].nunique()
         if n_unique <= 5:
             unique_vals = sorted(df_temp['studied_credits'].unique())
@@ -90,7 +91,7 @@ def plot_logrank_curves(df, covariable, language='es'):
                     )
                 ))
                 
-                # Añadir intervalos de confianza
+                # Add confidence intervals.
                 ci = kmf.confidence_interval_survival_function_
                 fig.add_trace(go.Scatter(
                     x=kmf.timeline.tolist(),
@@ -112,19 +113,19 @@ def plot_logrank_curves(df, covariable, language='es'):
                     fillcolor=f"rgba({int(colors[i % len(colors)][1:3], 16)}, {int(colors[i % len(colors)][3:5], 16)}, {int(colors[i % len(colors)][5:7], 16)}, 0.2)"
                 ))
     
-    # Si es variable categórica multi-clase (age_band, highest_education)
+    # Categorical variables with multiple classes (age_band, highest_education).
     elif len(columns) > 1:
-        # Iterar sobre TODAS las columnas mapeadas, incluso si no existen en el dataframe actual
+        # Iterate over ALL mapped columns, even if absent from the current dataframe.
         groups_info = []
         for col in columns:
-            # Extraer label directamente del mapeo
-            label = LABEL_MAPPING.get(col, col.split('_', 1)[1] if '_' in col else col)
+            # Extract the label directly from the mapping.
+            label = get_display_text(language, LABEL_MAPPING.get(col, col.split('_', 1)[1] if '_' in col else col))
             
-            # Obtener datos si la columna existe, si no, un dataframe vacío
+            # Get data if the column exists; otherwise use an empty dataframe.
             if col in df.columns:
                 df_group = df[df[col] == 1]
             else:
-                df_group = pd.DataFrame()  # Columna no existe en datos
+                df_group = pd.DataFrame()  # The column does not exist in the data.
             
             groups_info.append({
                 'col': col, 
@@ -133,7 +134,7 @@ def plot_logrank_curves(df, covariable, language='es'):
                 'n': len(df_group)
             })
         
-        print(f'[LOGRANK CURVES] Grupos mapeados: {[info["label"] + f" (n={info["n"]})" for info in groups_info]}')
+        print(f"""[LOGRANK CURVES] Mapped groups: {[info["label"] + f" (n={info["n"]})" for info in groups_info]}""")
         
         for i, info in enumerate(groups_info):
             if len(info['data']) > 0:
@@ -153,7 +154,7 @@ def plot_logrank_curves(df, covariable, language='es'):
                     )
                 ))
                 
-                # Intervalos de confianza
+                # Confidence intervals.
                 ci = kmf.confidence_interval_survival_function_
                 fig.add_trace(go.Scatter(
                     x=kmf.timeline.tolist(),
@@ -175,7 +176,7 @@ def plot_logrank_curves(df, covariable, language='es'):
                     fillcolor=f"rgba({int(colors[i % len(colors)][1:3], 16)}, {int(colors[i % len(colors)][3:5], 16)}, {int(colors[i % len(colors)][5:7], 16)}, 0.2)"
                 ))
             else:
-                # Grupo sin datos - mostrar como línea punteada gris con n=0
+                # Show groups without data as dashed gray lines with n=0.
                 fig.add_trace(go.Scatter(
                     x=[],
                     y=[],
@@ -186,11 +187,11 @@ def plot_logrank_curves(df, covariable, language='es'):
                     hovertemplate=f"<b>{info['label']}</b><br>{'No observations in this group' if is_en else 'Sin observaciones en este grupo'}<extra></extra>"
                 ))
     
-    # Si es variable binaria simple (gender_F, disability_N)
+    # Simple binary variables (gender_F, disability_N).
     else:
         col = columns[0]
         groups = sorted(df[col].dropna().unique())
-        labels = [f"{LABEL_MAPPING.get(col, col)}: {vals}" for vals in groups]
+        labels = [f"{get_display_text(language, LABEL_MAPPING.get(col, col))}: {vals}" for vals in groups]
         
         for i, group_val in enumerate(groups):
             df_group = df[df[col] == group_val]
@@ -210,7 +211,7 @@ def plot_logrank_curves(df, covariable, language='es'):
                     )
                 ))
                 
-                # Intervalos de confianza
+                # Confidence intervals.
                 ci = kmf.confidence_interval_survival_function_
                 fig.add_trace(go.Scatter(
                     x=kmf.timeline.tolist(),
@@ -234,9 +235,9 @@ def plot_logrank_curves(df, covariable, language='es'):
     
     fig.update_layout(
         title=(
-            f"Survival Curves (Kaplan-Meier) - {LABEL_MAPPING.get(covariable, covariable)}"
+            f"Survival Curves (Kaplan-Meier) - {get_display_text(language, LABEL_MAPPING.get(covariable, covariable))}"
             if is_en else
-            f"Curvas de Supervivencia (Kaplan-Meier) - {LABEL_MAPPING.get(covariable, covariable)}"
+            f"Curvas de Supervivencia (Kaplan-Meier) - {get_display_text(language, LABEL_MAPPING.get(covariable, covariable))}"
         ),
         xaxis_title="Time" if is_en else "Tiempo",
         yaxis_title="Survival Probability" if is_en else "Probabilidad de Supervivencia",
@@ -248,32 +249,32 @@ def plot_logrank_curves(df, covariable, language='es'):
     return dcc.Graph(figure=fig)
 
 
-def plot_cox_hazard_ratios(summary_df, covariable_name, language='es'):
+def plot_cox_hazard_ratios(summary_df, covariable_name, language='en'):
     """
-    Crea una gráfica de Forest Plot (Hazard Ratios con intervalos de confianza).
-    
+    Create a forest plot with hazard ratios and confidence intervals.
+
     Args:
-        summary_df: DataFrame con los resultados de Cox Regression (de cph.summary)
-        covariable_name: Nombre de la covariable
-    
+        summary_df: Cox regression results from cph.summary.
+        covariable_name: Covariate name.
+
     Returns:
-        dcc.Graph con el Forest Plot
+        dcc.Graph containing the forest plot.
     """
     
-    # Asegurar que tenemos los datos correctos
+    # Ensure the correct data is available.
     summary_df = summary_df.copy()
     
-    # Detectar nombres de columnas (pueden variar entre versiones de lifelines)
+    # Detect column names, which may vary across lifelines versions.
     coef_col = 'coef' if 'coef' in summary_df.columns else 'Coef.'
     se_col = 'se(coef)' if 'se(coef)' in summary_df.columns else 'SE(Coef.)'
     
-    # Calcular HR (Hazard Ratio) y sus intervalos de confianza
+    # Calculate HR (hazard ratio) and its confidence intervals.
     summary_df['HR'] = np.exp(pd.to_numeric(summary_df[coef_col], errors='coerce'))
     summary_df['se_coef'] = pd.to_numeric(summary_df[se_col], errors='coerce')
     summary_df['HR_lower'] = np.exp(pd.to_numeric(summary_df[coef_col], errors='coerce') - 1.96 * summary_df['se_coef'])
     summary_df['HR_upper'] = np.exp(pd.to_numeric(summary_df[coef_col], errors='coerce') + 1.96 * summary_df['se_coef'])
     
-    # Remover filas con NaN
+    # Remove rows with NaN.
     summary_df = summary_df.dropna(subset=['HR', 'HR_lower', 'HR_upper'])
     
     is_en = language == 'en'
@@ -283,18 +284,18 @@ def plot_cox_hazard_ratios(summary_df, covariable_name, language='es'):
     
     fig = go.Figure()
     
-    # Detectar nombre de variablecolumna
+    # Detect the variable column name.
     var_col = 'Covariable' if 'Covariable' in summary_df.columns else summary_df.columns[0]
     
     colors = ['green' if hr < 1 else 'red' for hr in summary_df['HR']]
     y_labels = []
     
-    # Añadir línea de referencia vertical en HR=1 (sin efecto)
+    # Add a vertical reference line at HR=1 (no effect).
     fig.add_vline(x=1, line_dash="dash", line_color="black", 
                   annotation_text="HR = 1 (No effect)" if is_en else "HR = 1 (Sin efecto)", annotation_position="top",
                   annotation_textangle=0)
     
-    # Añadir los puntos y barras de error
+    # Add points and error bars.
     for idx, (i, row) in enumerate(summary_df.iterrows()):
         var_name = str(row[var_col]) if var_col in row and pd.notna(row[var_col]) else f"Var {idx}"
         y_labels.append(var_name)
@@ -308,7 +309,7 @@ def plot_cox_hazard_ratios(summary_df, covariable_name, language='es'):
             hovertemplate=f"<b>{var_name}</b><br>HR: %{{x:.3f}}<br>IC 95%: ({row['HR_lower']:.3f} - {row['HR_upper']:.3f})<extra></extra>"
         ))
         
-        # Barras de error (líneas horizontales)
+        # Error bars (horizontal lines).
         fig.add_trace(go.Scatter(
             x=[row['HR_lower'], row['HR_upper']],
             y=[idx, idx],

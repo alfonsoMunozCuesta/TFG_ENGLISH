@@ -1,6 +1,6 @@
 @echo off
-REM Script para iniciar llama-server con un modelo GGUF local.
-REM No usa rutas absolutas del equipo.
+REM Start llama-server with a local GGUF model.
+REM No machine-specific absolute paths are used.
 
 setlocal enabledelayedexpansion
 set "PROJECT_DIR=%~dp0"
@@ -9,9 +9,9 @@ set "DEFAULT_LLAMA_SERVER=%PROJECT_DIR%tools\llama.cpp\llama-server.exe"
 set "LEGACY_MODEL_PATH=%USERPROFILE%\Desktop\IA\qwen2.5-1.5b-instruct-q4_k_m.gguf"
 set "LEGACY_LLAMA_SERVER=%USERPROFILE%\Desktop\IA\llama.cpp\llama-server.exe"
 
-REM Puedes sobrescribir estas rutas antes de ejecutar el script:
-REM   set MODEL_PATH=C:\ruta\al\modelo.gguf
-REM   set LLAMA_SERVER=C:\ruta\a\llama-server.exe
+REM You can override these paths before running the script:
+REM   set MODEL_PATH=C:\path\to\model.gguf
+REM   set LLAMA_SERVER=C:\path\to\llama-server.exe
 if "%MODEL_PATH%"=="" (
     if exist "%DEFAULT_MODEL_PATH%" (
         set "MODEL_PATH=%DEFAULT_MODEL_PATH%"
@@ -32,7 +32,7 @@ if "%LLAMA_SERVER%"=="" (
     )
 )
 
-REM Parametros de inferencia. Ajusta estos valores segun tu CPU/RAM.
+REM Inference parameters. Adjust these values for your CPU/RAM.
 if "%N_THREADS%"=="" set "N_THREADS=8"
 if "%N_CTX%"=="" set "N_CTX=4096"
 if "%N_BATCH%"=="" set "N_BATCH=512"
@@ -40,35 +40,35 @@ if "%N_UBATCH%"=="" set "N_UBATCH=128"
 
 echo.
 echo ========================================
-echo   INICIANDO LLAMA-SERVER
+echo   STARTING LLAMA-SERVER
 echo ========================================
 echo.
 
 if not exist "%LLAMA_SERVER%" (
-    echo ERROR: llama-server.exe no encontrado en:
+    echo ERROR: llama-server.exe was not found at:
     echo %LLAMA_SERVER%
     echo.
-    echo Ajusta la variable LLAMA_SERVER o coloca llama-server.exe en:
+    echo Set the LLAMA_SERVER variable or place llama-server.exe in:
     echo %PROJECT_DIR%tools\llama.cpp\
     pause
     exit /b 1
 )
 
 if not exist "%MODEL_PATH%" (
-    echo ERROR: Modelo GGUF no encontrado en:
+    echo ERROR: GGUF model was not found at:
     echo %MODEL_PATH%
     echo.
-    echo Ajusta la variable MODEL_PATH o coloca el modelo en:
+    echo Set the MODEL_PATH variable or place the model in:
     echo %PROJECT_DIR%models\
     pause
     exit /b 1
 )
 
-echo [OK] Modelo encontrado: %MODEL_PATH%
-echo [OK] Servidor encontrado: %LLAMA_SERVER%
+echo [OK] Model found: %MODEL_PATH%
+echo [OK] Server found: %LLAMA_SERVER%
 echo [i] N_THREADS=%N_THREADS%  N_CTX=%N_CTX%  N_BATCH=%N_BATCH%  N_UBATCH=%N_UBATCH%
 echo.
-echo Iniciando servidor en: http://127.0.0.1:8000
+echo Starting server at: http://127.0.0.1:8000
 echo.
 
 "%LLAMA_SERVER%" ^

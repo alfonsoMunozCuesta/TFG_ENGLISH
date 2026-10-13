@@ -1,6 +1,6 @@
 """
-Callbacks para exportación de análisis a PDF
-Genera PDFs profesionales con datos reales de los análisis
+Callbacks for exporting analyses to PDF.
+Generate professional PDFs using actual analysis data.
 """
 
 from dash import callback_context, dcc, html, Output, Input, State
@@ -20,32 +20,32 @@ from rsf import build_rsf_analysis, build_rsf_profile_analysis
 
 
 def clean_markdown_text(text):
-    """Limpia markdown del texto para renderizarlo correctamente en ReportLab"""
+    """Remove Markdown formatting for correct rendering in ReportLab."""
     if not text:
         return text
     
-    # Remover headers markdown (### ..., ## ..., # ...)
+    # Remove Markdown headings (### ..., ## ..., # ...).
     text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
     
-    # Convertir markdown bold (**text**) a HTML <b></b>
+    # Convert Markdown bold (**text**) to HTML <b></b>.
     text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
     
-    # Convertir markdown italic (*text*) a HTML <i></i> (excepto ** ya procesado)
+    # Convert Markdown italic (*text*) to HTML <i></i>, excluding processed **.
     text = re.sub(r'\*(.+?)\*', r'<i>\1</i>', text)
     
-    # Limpiar múltiples espacios/saltos de línea
+    # Normalize repeated spaces and line breaks.
     text = re.sub(r'\n{3,}', '\n\n', text)
     
     return text
 
 
 def _prepare_ai_text_for_pdf(text):
-    """Normaliza la explicacion ya generada antes de insertarla en el PDF."""
+    """Normalize the existing explanation before inserting it into the PDF."""
     return clean_markdown_text((text or "").strip())
 
 
 def _looks_like_incomplete_ai_text(text):
-    """Detecta respuestas que probablemente quedaron cortadas a mitad de frase."""
+    """Detect responses that were probably cut off mid-sentence."""
     normalized_text = (text or "").strip()
     if not normalized_text:
         return False
@@ -64,8 +64,8 @@ def _looks_like_incomplete_ai_text(text):
     return bool(trailing_words and trailing_words[-1] in unfinished_connectors) or last_char not in complete_endings
 
 
-def _validate_ai_explanation(ai_requested, ai_text, analysis_label, language='es'):
-    """Exige explicación solo si el usuario pidió IA y no hay texto real."""
+def _validate_ai_explanation(ai_requested, ai_text, analysis_label, language='en'):
+    """Require an explanation only if the user selected AI and no actual text exists."""
     if not ai_requested:
         return None
 
@@ -85,7 +85,7 @@ def _validate_ai_explanation(ai_requested, ai_text, analysis_label, language='es
 
 
 def _validate_ai_language(ai_requested, generated_language, current_language):
-    """Valida que la explicación IA se haya generado en el idioma activo."""
+    """Check that the AI explanation was generated in the active language."""
     if not ai_requested:
         return None
 
@@ -101,15 +101,15 @@ def _validate_ai_language(ai_requested, generated_language, current_language):
 
 
 def _get_report_name_from_filename(filename):
-    """Obtiene un nombre de informe limpio a partir del nombre de archivo PDF."""
+    """Get a clean report name from the PDF filename."""
     base_name = os.path.splitext(os.path.basename(filename or ""))[0].strip()
     return base_name or "informe"
 
 
 def register_pdf_export_callbacks(app):
     """
-    Registra todos los callbacks para la funcionalidad de exportación a PDF
-    Incluye modales para Kaplan-Meier, Cox Regression, Log-Rank Test, Weibull y RSF
+    Register all callbacks for PDF export.
+    Include modals for Kaplan-Meier, Cox regression, Log-Rank, Weibull, and RSF.
     """
     
     # ===== KAPLAN-MEIER PDF CALLBACKS =====
@@ -123,7 +123,7 @@ def register_pdf_export_callbacks(app):
         prevent_initial_call=True
     )
     def toggle_km_pdf_modal(export_clicks, close_clicks, cancel_clicks):
-        """Abre/cierra el modal de exportación Kaplan-Meier"""
+        """Open/close the Kaplan-Meier export modal."""
         if not callback_context.triggered:
             return {'display': 'none'}, {'display': 'none'}
         
@@ -149,9 +149,9 @@ def register_pdf_export_callbacks(app):
         prevent_initial_call=True
     )
     def download_km_pdf(n_clicks, filename, options, current_variable, ai_text_from_page, df_json, language):
-        """Genera PDF de Kaplan-Meier con datos REALES del análisis seleccionado"""
+        """Generate a Kaplan-Meier PDF using ACTUAL data from the selected analysis."""
         try:
-            # Generar nombre de archivo
+            # Generate the filename.
             if not filename or filename.strip() == '':
                 var_name = current_variable if current_variable else 'general'
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -179,7 +179,7 @@ def register_pdf_export_callbacks(app):
                     'fontWeight': 'bold'
                 }
             
-            # CAPTURAR DATOS REALES DEL ANÁLISIS
+            # CAPTURE ACTUAL ANALYSIS DATA.
             df = None
             if df_json:
                 try:
@@ -187,7 +187,7 @@ def register_pdf_export_callbacks(app):
                 except:
                     df = None
             
-            # CALCULAR ESTADÍSTICAS REALES DEL ANÁLISIS ACTUAL
+            # CALCULATE ACTUAL STATISTICS FOR THE CURRENT ANALYSIS.
             n_patients = len(df) if df is not None else 0
             n_events = int(df['final_result'].sum()) if df is not None and 'final_result' in df.columns else 0
             follow_up_mean = float(df['date'].mean()) if df is not None and 'date' in df.columns else 0
@@ -201,7 +201,7 @@ def register_pdf_export_callbacks(app):
                 'variable_name': current_variable if current_variable else 'General'
             }
             
-            # GENERAR TABLA DE SUPERVIVENCIA REAL
+            # GENERATE THE ACTUAL SURVIVAL TABLE.
             km_table = None
             if df is not None and n_patients > 0:
                 try:
@@ -211,17 +211,17 @@ def register_pdf_export_callbacks(app):
                     km_table = kmf.survival_function_.reset_index()
                     km_table.columns = ['Tiempo', 'Supervivencia']
                 except Exception as e:
-                    print(f"[KM PDF] Error generando tabla KM: {e}")
+                    print(f"""[KM PDF] Error generating KM table: {e}""")
                     km_table = None
             
-            # GENERAR GRÁFICA DE KM SI SE SOLICITA
+            # GENERATE THE KM CHART IF REQUESTED.
             km_figure = None
             if 'graph' in options and df is not None and current_variable:
                 try:
-                    print(f"[KM PDF] Regenerando gráfica de KM para {current_variable}...")
+                    print(f"""[KM PDF] Rebuilding the KM chart for {current_variable}...""")
                     from kaplan_meier import _create_km_figure
                     
-                    # Mapear variable a nombre de covariable correcto
+                    # Map the variable to the correct covariate name.
                     covariate_map = {
                         'gender': 'gender_F',
                         'disability': 'disability_N',
@@ -230,55 +230,55 @@ def register_pdf_export_callbacks(app):
                         'credit': 'studied_credits'
                     }
                     
-                    # Buscar qué covariable usar
+                    # Find which covariate to use.
                     covariate_col = current_variable
                     for key, val in covariate_map.items():
                         if key.lower() in current_variable.lower():
                             covariate_col = val
                             break
                     
-                    #Crear figura Plotly directamente
-                    km_figure = _create_km_figure(df, covariate_col)
-                    print(f"[KM PDF] Gráfica KM regenerada para {covariate_col}")
+                    # Create a Plotly figure directly.
+                    km_figure = _create_km_figure(df, covariate_col, language=language)
+                    print(f"""[KM PDF] KM chart rebuilt for {covariate_col}""")
                     
                 except Exception as e:
-                    print(f"[KM PDF] Error regenerando gráfica: {e}")
+                    print(f"""[KM PDF] Error rebuilding chart: {e}""")
                     traceback.print_exc()
                     km_figure = None
             
-            # REUTILIZAR LA INTERPRETACION IA YA GENERADA EN PANTALLA
+            # REUSE THE AI INTERPRETATION ALREADY GENERATED ON SCREEN.
             ai_text = ""
             if 'ai_interpretation' in options:
-                print(f"[KM PDF] Reutilizando interpretacion IA generada en pantalla para {current_variable}...")
+                print(f"""[KM PDF] Reusing the AI interpretation generated on screen for {current_variable}...""")
                 ai_text = _prepare_ai_text_for_pdf(ai_text_from_page)
             
-            print(f"[KM PDF] Generando PDF: {filename}")
-            print(f"[KM PDF] Variable: {current_variable} | Pacientes: {n_patients} | Eventos: {n_events}")
-            print(f"[KM PDF] Opciones marcadas: {options}")
+            print(f"""[KM PDF] Generating PDF: {filename}""")
+            print(f"""[KM PDF] Variable: {current_variable} | Patients: {n_patients} | Events: {n_events}""")
+            print(f"""[KM PDF] Selected options: {options}""")
             
-            # GENERAR PDF CON DATOS REALES - SOLO LO QUE SE MARCÓ
+            # GENERATE A PDF WITH ACTUAL DATA, INCLUDING ONLY SELECTED CONTENT.
             report_title = f"KAPLAN-MEIER REPORT: {current_variable.upper() if current_variable else 'GENERAL'}"
             export_survival_analysis_to_pdf(
                 filename=pdf_path,
                 title=report_title,
                 report_name=report_name,
-                include_summary='summary' in options,  # Mostrar resumen SOLO si se marcó
-                include_km='table' in options or 'graph' in options,  # Mostrar KM si marcó tabla o gráfica
+                include_summary='summary' in options,  # Show the summary ONLY if selected.
+                include_km='table' in options or 'graph' in options,  # Show KM if the table or chart was selected.
                 km_figure=km_figure if 'graph' in options else None,
                 km_table=km_table if 'table' in options else None,
                 include_cox=False,
                 include_logrank=False,
-                include_ai_interpretation='ai_interpretation' in options,  # Mostrar IA SOLO si se marcó
+                include_ai_interpretation='ai_interpretation' in options,  # Show AI ONLY if selected.
                 ai_text=ai_text,
                 summary_stats=summary_stats if 'summary' in options else None,
                 language=language
             )
             
-            print(f"[KM PDF] PDF generado en: {pdf_path}")
+            print(f"""[KM PDF] PDF generated at: {pdf_path}""")
             return dcc.send_file(pdf_path), "", {'display': 'none'}
         
         except Exception as e:
-            print(f"ERROR en download_km_pdf: {str(e)}")
+            print(f"""ERROR in download_km_pdf: {str(e)}""")
             print(traceback.format_exc())
             error_label = 'Kaplan-Meier' if language == 'es' else 'Kaplan-Meier'
             return None, (f"❌ Error al generar el PDF de Kaplan-Meier: {str(e)}" if language == 'es' else f"❌ Error generating the Kaplan-Meier PDF: {str(e)}"), {
@@ -305,7 +305,7 @@ def register_pdf_export_callbacks(app):
         prevent_initial_call=True
     )
     def toggle_cox_pdf_modal(export_clicks, close_clicks, cancel_clicks):
-        """Abre/cierra el modal de exportación Cox Regression"""
+        """Open/close the Cox regression export modal."""
         if not callback_context.triggered:
             return {'display': 'none'}, {'display': 'none'}
         
@@ -334,9 +334,9 @@ def register_pdf_export_callbacks(app):
         prevent_initial_call=True
     )
     def download_cox_pdf(n_clicks, filename, options, cox_variables_text, cox_covariables, cox_store_data, ai_text_from_page, df_json, dataset_signature, language):
-        """Genera PDF de Cox Regression con datos REALES del análisis actualizado"""
+        """Generate a Cox regression PDF using ACTUAL data from the updated analysis."""
         try:
-            # Generar nombre de archivo
+            # Generate the filename.
             if not filename or filename.strip() == '':
                 vars_str = ','.join(cox_covariables[:2]) if cox_covariables else 'general'
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -429,63 +429,63 @@ def register_pdf_export_callbacks(app):
                     'fontWeight': 'bold'
                 }
             
-            print(f"\n[COX PDF] ========== INICIANDO EXPORTACIÓN ==========")
-            print(f"[COX PDF] Opciones marcadas: {options}")
-            print(f"[COX PDF] Variables seleccionadas: {cox_covariables}")
+            print(f"""\n[COX PDF] ========== STARTING EXPORT ==========""")
+            print(f"""[COX PDF] Selected options: {options}""")
+            print(f"""[COX PDF] Selected variables: {cox_covariables}""")
             
-            # CAPTURAR DATOS REALES DEL ANÁLISIS ACTUAL
+            # CAPTURE ACTUAL DATA FROM THE CURRENT ANALYSIS.
             df = None
             cox_table = None
             
             if df_json and cox_covariables:
                 try:
                     df = pd.read_json(df_json, orient='split')
-                    print(f"[COX PDF] DataFrame cargado: {len(df)} rows, {len(df.columns)} cols")
+                    print(f"""[COX PDF] DataFrame loaded: {len(df)} rows, {len(df.columns)} cols""")
                     
-                    # RECALCULAR COX REGRESSION CON LAS VARIABLES SELECCIONADAS
+                    # RECALCULATE COX REGRESSION WITH THE SELECTED VARIABLES.
                     from cox_regression import run_cox_regression
-                    print(f"[COX PDF] Ejecutando run_cox_regression({cox_covariables})...")
+                    print(f"""[COX PDF] Running run_cox_regression({cox_covariables})...""")
                     
                     summary, cox_table_html = run_cox_regression(df, cox_covariables)
-                    print(f"[COX PDF] Summary retornado: empty={summary.empty}, shape={summary.shape}")
+                    print(f"""[COX PDF] Summary returned: empty={summary.empty}, shape={summary.shape}""")
                     print(f"[COX PDF] Summary columns: {list(summary.columns) if not summary.empty else 'N/A'}")
                     
-                    # Convertir el resumen a tabla limpia
+                    # Convert the summary into a clean table.
                     if not summary.empty:
-                        print(f"[COX PDF] Creando tabla de coeficientes...")
+                        print(f"""[COX PDF] Creating coefficient table...""")
                         try:
-                            # Verificar si contiene ERROR
+                            # Check whether it contains ERROR.
                             if 'ERROR' in summary.get('Covariable', summary.get(summary.columns[0], [])).values:
-                                print(f"[COX PDF] Error detectado en Cox: {summary}")
+                                print(f"""[COX PDF] Error detected in Cox: {summary}""")
                                 cox_table = None
                             else:
-                                # Usar los nombres de columnas ya formateados que devuelve run_cox_regression
-                                # Los nombres son: Covariable, Coef., exp(Coef.), SE(Coef.), Coef. lower 95%, etc.
+                                # Use the formatted column names returned by run_cox_regression.
+                                # Names: Covariable, Coef., exp(Coef.), SE(Coef.), Coef. lower 95%, etc.
                                 cols_disponibles = [c for c in ['Covariable', 'Coef.', 'exp(Coef.)', 'Coef. lower 95%', 'Coef. upper 95%', 'p'] 
                                                    if c in summary.columns]
                                 
                                 if not cols_disponibles or len(cols_disponibles) < 2:
-                                    print(f"[COX PDF] Columnas disponibles insuficientes: {list(summary.columns)}")
+                                    print(f"""[COX PDF] Insufficient available columns: {list(summary.columns)}""")
                                     cox_table = None
                                 else:
                                     cox_table = summary[cols_disponibles].copy()
                                     if 'Covariable' in cox_table.columns:
                                         cox_table.columns = ['Variable'] + [c for c in summary.columns[1:] if c in cols_disponibles[1:]]
-                                    print(f"[COX PDF] Tabla creada: {cox_table.shape[0]} variables, {len(cols_disponibles)} columnas")
-                                    print(f"[COX PDF] Primeras filas:\n{cox_table.head()}")
+                                    print(f"""[COX PDF] Table created: {cox_table.shape[0]} variables, {len(cols_disponibles)} columns""")
+                                    print(f"""[COX PDF] First rows:\n{cox_table.head()}""")
                         except Exception as e:
-                            print(f"[COX PDF] Error creando tabla: {e}")
+                            print(f"""[COX PDF] Error creating table: {e}""")
                             traceback.print_exc()
                             cox_table = None
                     
-                    print(f"[COX PDF] Análisis recalculado para variables: {cox_covariables}")
+                    print(f"""[COX PDF] Analysis recalculated for variables: {cox_covariables}""")
                 
                 except Exception as e:
-                    print(f"[COX PDF] Error recalculando Cox: {e}")
+                    print(f"""[COX PDF] Error recalculating Cox: {e}""")
                     traceback.print_exc()
                     cox_table = None
             
-            # CALCULAR ESTADÍSTICAS DE RESUMEN REALES
+            # CALCULATE ACTUAL SUMMARY STATISTICS.
             n_patients = len(df) if df is not None else 0
             n_events = int(df['final_result'].sum()) if df is not None and 'final_result' in df.columns else 0
             follow_up_mean = float(df['date'].mean()) if df is not None and 'date' in df.columns else 0
@@ -499,17 +499,17 @@ def register_pdf_export_callbacks(app):
                 'variable_name': ', '.join(cox_covariables) if cox_covariables else 'N/A'
             }
             
-            # REUTILIZAR LA INTERPRETACION IA YA GENERADA EN PANTALLA
+            # REUSE THE AI INTERPRETATION ALREADY GENERATED ON SCREEN.
             ai_text = ""
             if 'ai_interpretation' in options:
-                print(f"[COX PDF] Reutilizando interpretacion IA generada en pantalla...")
+                print(f"""[COX PDF] Reusing the AI interpretation generated on screen...""")
                 ai_text = _prepare_ai_text_for_pdf(ai_text_from_page)
-                print(f"[COX PDF] Interpretacion reutilizada ({len(ai_text)} chars)")
+                print(f"""[COX PDF] Interpretation reused ({len(ai_text)} chars)""")
             
-            # GENERAR FOREST PLOT SI SE SOLICITA
+            # GENERATE THE FOREST PLOT IF REQUESTED.
             forest_figure = None
             if 'graph' in options and not summary.empty:
-                print(f"[COX PDF] Generando Forest Plot igual al mostrado en el dashboard...")
+                print(f"""[COX PDF] Generating the same forest plot as the dashboard...""")
                 try:
                     from survival_plots import plot_cox_hazard_ratios
                     forest_component = plot_cox_hazard_ratios(
@@ -519,16 +519,16 @@ def register_pdf_export_callbacks(app):
                     )
                     forest_figure = getattr(forest_component, 'figure', None)
                     if forest_figure is not None:
-                        print(f"[COX PDF] Forest Plot generado")
+                        print(f"""[COX PDF] Forest plot generated""")
                 except Exception as e:
-                    print(f"[COX PDF] Error generando Forest Plot: {e}")
+                    print(f"""[COX PDF] Error generating forest plot: {e}""")
                     forest_figure = None
             
-            print(f"[COX PDF] Generando PDF: {filename}")
-            print(f"[COX PDF] Variables: {cox_covariables} | Pacientes: {n_patients} | Eventos: {n_events}")
-            print(f"[COX PDF] Tabla Cox será incluida: {'table' in options and cox_table is not None}")
-            print(f"[COX PDF] Forest Plot será incluido: {'graph' in options and forest_figure is not None}")
-            # GENERAR PDF CON DATOS REALES - SOLO LO QUE SE MARCÓ
+            print(f"""[COX PDF] Generating PDF: {filename}""")
+            print(f"""[COX PDF] Variables: {cox_covariables} | Patients: {n_patients} | Events: {n_events}""")
+            print(f"""[COX PDF] Include Cox table: {'table' in options and cox_table is not None}""")
+            print(f"""[COX PDF] Include forest plot: {'graph' in options and forest_figure is not None}""")
+            # GENERATE A PDF WITH ACTUAL DATA, INCLUDING ONLY SELECTED CONTENT.
             report_title = (
                 f"COX REGRESSION REPORT: {', '.join(cox_covariables) if cox_covariables else 'GENERAL'}"
             )
@@ -536,24 +536,24 @@ def register_pdf_export_callbacks(app):
                 filename=pdf_path,
                 title=report_title,
                 report_name=report_name,
-                include_summary='summary' in options,  # Mostrar resumen SOLO si se marcó
+                include_summary='summary' in options,  # Show the summary ONLY if selected.
                 include_km=False,
-                include_cox='table' in options or 'graph' in options,  # Mostrar Cox si marcó tabla O gráfica
+                include_cox='table' in options or 'graph' in options,  # Show Cox if the table OR chart was selected.
                 cox_table=cox_table if 'table' in options else None,
-                forest_figure=forest_figure if 'graph' in options else None,  # Mostrar gráfica SOLO si se marcó
+                forest_figure=forest_figure if 'graph' in options else None,  # Show the chart ONLY if selected.
                 include_logrank=False,
-                include_ai_interpretation='ai_interpretation' in options,  # Mostrar IA SOLO si se marcó
+                include_ai_interpretation='ai_interpretation' in options,  # Show AI ONLY if selected.
                 ai_text=ai_text,
                 summary_stats=summary_stats if 'summary' in options else None,
                 language=language
             )
             
-            print(f"[COX PDF] PDF generado en: {pdf_path}")
-            print(f"[COX PDF] ========== EXPORTACIÓN COMPLETADA ==========\n")
+            print(f"""[COX PDF] PDF generated at: {pdf_path}""")
+            print(f"""[COX PDF] ========== EXPORT COMPLETED ==========\n""")
             return dcc.send_file(pdf_path), "", {'display': 'none'}
         
         except Exception as e:
-            print(f"ERROR en download_cox_pdf: {str(e)}")
+            print(f"""ERROR in download_cox_pdf: {str(e)}""")
             print(traceback.format_exc())
             return None, (f"❌ Error al generar el PDF de Cox: {str(e)}" if language == 'es' else f"❌ Error generating the Cox PDF: {str(e)}"), {
                 'display': 'block',
@@ -579,7 +579,7 @@ def register_pdf_export_callbacks(app):
         prevent_initial_call=True
     )
     def toggle_logrank_pdf_modal(export_clicks, close_clicks, cancel_clicks):
-        """Abre/cierra el modal de exportación Log-Rank"""
+        """Open/close the Log-Rank export modal."""
         if not callback_context.triggered:
             return {'display': 'none'}, {'display': 'none'}
         
@@ -608,9 +608,9 @@ def register_pdf_export_callbacks(app):
         prevent_initial_call=True
     )
     def download_logrank_pdf(n_clicks, filename, options, logrank_variable, logrank_covariables, logrank_store_data, ai_text_from_page, df_json, dataset_signature, language):
-        """Genera PDF de Log-Rank Test con datos REALES del análisis actualizado"""
+        """Generate a Log-Rank PDF using ACTUAL data from the updated analysis."""
         try:
-            # Generar nombre de archivo
+            # Generate the filename.
             if not filename or filename.strip() == '':
                 var_str = logrank_variable if logrank_variable else 'general'
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -703,11 +703,11 @@ def register_pdf_export_callbacks(app):
                     'fontWeight': 'bold'
                 }
             
-            print(f"\n[LOGRANK PDF] ========== INICIANDO EXPORTACIÓN ==========")
-            print(f"[LOGRANK PDF] Opciones marcadas: {options}")
-            print(f"[LOGRANK PDF] Variables seleccionadas: {logrank_covariables}")
+            print(f"""\n[LOGRANK PDF] ========== STARTING EXPORT ==========""")
+            print(f"""[LOGRANK PDF] Selected options: {options}""")
+            print(f"""[LOGRANK PDF] Selected variables: {logrank_covariables}""")
             
-            # CAPTURAR DATOS REALES DEL ANÁLISIS ACTUAL
+            # CAPTURE ACTUAL DATA FROM THE CURRENT ANALYSIS.
             df = None
             logrank_results = None
             logrank_figure = None
@@ -715,10 +715,10 @@ def register_pdf_export_callbacks(app):
             if df_json and logrank_covariables:
                 df = pd.read_json(df_json, orient='split')
                 
-                # RECALCULAR LOG-RANK TEST CON LA VARIABLE SELECCIONADA
+                # RECALCULATE THE LOG-RANK TEST WITH THE SELECTED VARIABLE.
                 from log_rank_test import perform_log_rank_test, create_logrank_figure
                 
-                # Procesar cada covariable y acumular resultados
+                # Process each covariate and accumulate the results.
                 all_results = []
                 for covariable in logrank_covariables:
                     res_df = perform_log_rank_test(df, covariable)
@@ -728,18 +728,18 @@ def register_pdf_export_callbacks(app):
                 if all_results:
                     logrank_results = pd.concat(all_results, ignore_index=True)
                 
-                # GENERAR GRÁFICA SI SE SOLICITA
+                # GENERATE THE CHART IF REQUESTED.
                 if 'graph' in options and logrank_covariables:
-                    print(f"[LOGRANK PDF] Generando gráfica...")
+                    print(f"""[LOGRANK PDF] Generating chart...""")
                     try:
-                        logrank_figure = create_logrank_figure(df, logrank_covariables[0])
+                        logrank_figure = create_logrank_figure(df, logrank_covariables[0], language=language)
                         if logrank_figure:
-                            print(f"[LOGRANK PDF] Gráfica Log-Rank generada")
+                            print(f"""[LOGRANK PDF] Log-Rank chart generated""")
                     except Exception as e:
-                        print(f"[LOGRANK PDF] Error generando gráfica: {e}")
+                        print(f"""[LOGRANK PDF] Error generating chart: {e}""")
                         logrank_figure = None
             
-            # CALCULAR ESTADÍSTICAS DE RESUMEN
+            # CALCULATE SUMMARY STATISTICS.
             n_patients = len(df) if df is not None else 0
             n_events = int(df['final_result'].sum()) if df is not None and 'final_result' in df.columns else 0
             follow_up_mean = float(df['date'].mean()) if df is not None and 'date' in df.columns else 0
@@ -753,17 +753,17 @@ def register_pdf_export_callbacks(app):
                 'variable_name': ', '.join(logrank_covariables) if logrank_covariables else 'N/A'
             }
             
-            print(f"[LOGRANK PDF] Tabla será incluida: {'table' in options and logrank_results is not None}")
-            print(f"[LOGRANK PDF] Gráfica será incluida: {'graph' in options and logrank_figure is not None}")
-            print(f"[LOGRANK PDF] Resumen será incluido: {'summary' in options}")
+            print(f"""[LOGRANK PDF] Include table: {'table' in options and logrank_results is not None}""")
+            print(f"""[LOGRANK PDF] Include chart: {'graph' in options and logrank_figure is not None}""")
+            print(f"""[LOGRANK PDF] Include summary: {'summary' in options}""")
 
             ai_text = ""
             if 'ai_interpretation' in options:
-                print(f"[LOGRANK PDF] Generando interpretación de IA...")
+                print(f"""[LOGRANK PDF] Generating AI interpretation...""")
                 ai_text = ai_text_from_page or generate_interpretation_for_pdf('log-rank', summary_stats, logrank_results, language=language)
                 ai_text = clean_markdown_text(ai_text)
             
-            # GENERAR PDF CON DATOS REALES - SOLO LO QUE SE MARCÓ
+            # GENERATE A PDF WITH ACTUAL DATA, INCLUDING ONLY SELECTED CONTENT.
             report_title = (
                 f"LOG-RANK TEST REPORT: {', '.join(logrank_covariables) if logrank_covariables else 'GENERAL'}"
             )
@@ -771,25 +771,25 @@ def register_pdf_export_callbacks(app):
                 filename=pdf_path,
                 title=report_title,
                 report_name=report_name,
-                include_summary='summary' in options,  # Mostrar resumen SOLO si se marcó
+                include_summary='summary' in options,  # Show the summary ONLY if selected.
                 include_km=False,
                 include_cox=False,
-                include_logrank='table' in options or 'graph' in options,  # Mostrar Log-Rank si marcó tabla O gráfica
-                logrank_figure=logrank_figure if 'graph' in options else None,  # Mostrar gráfica SOLO si se marcó
+                include_logrank='table' in options or 'graph' in options,  # Show Log-Rank if the table OR chart was selected.
+                logrank_figure=logrank_figure if 'graph' in options else None,  # Show the chart ONLY if selected.
                 logrank_results=logrank_results if 'table' in options else None,
                 include_ai_interpretation='ai_interpretation' in options,
                 ai_text=ai_text,
                 summary_stats=summary_stats if 'summary' in options else None,
                 language=language,
-                landscape_tables=['logrank']  # Hacer tabla Log-Rank en horizontal
+                landscape_tables=['logrank']  # Use landscape orientation for the Log-Rank table.
             )
             
-            print(f"[LOGRANK PDF] PDF generado en: {pdf_path}")
-            print(f"[LOGRANK PDF] ========== EXPORTACIÓN COMPLETADA ==========\n")
+            print(f"""[LOGRANK PDF] PDF generated at: {pdf_path}""")
+            print(f"""[LOGRANK PDF] ========== EXPORT COMPLETED ==========\n""")
             return dcc.send_file(pdf_path), "", {'display': 'none'}
         
         except Exception as e:
-            print(f"ERROR en download_logrank_pdf: {str(e)}")
+            print(f"""ERROR in download_logrank_pdf: {str(e)}""")
             print(traceback.format_exc())
             return None, (f"❌ Error al generar el PDF de Log-Rank: {str(e)}" if language == 'es' else f"❌ Error generating the Log-Rank PDF: {str(e)}"), {
                 'display': 'block',
@@ -815,7 +815,7 @@ def register_pdf_export_callbacks(app):
         prevent_initial_call=True
     )
     def toggle_weibexp_pdf_modal(export_clicks, close_clicks, cancel_clicks):
-        """Abre/cierra el modal de exportación combinada Weibull + Exponencial."""
+        """Open/close the combined Weibull + Exponential export modal."""
         if not callback_context.triggered:
             return {'display': 'none'}, {'display': 'none'}
 
@@ -855,7 +855,7 @@ def register_pdf_export_callbacks(app):
         df_json,
         language
     ):
-        """Genera un PDF combinado de Weibull + Exponencial."""
+        """Generate a combined Weibull + Exponential PDF."""
         try:
             if not filename or filename.strip() == '':
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -1029,7 +1029,7 @@ def register_pdf_export_callbacks(app):
             return dcc.send_file(pdf_path), "", {'display': 'none'}
 
         except Exception as e:
-            print(f"ERROR en download_weibexp_pdf: {str(e)}")
+            print(f"""ERROR in download_weibexp_pdf: {str(e)}""")
             print(traceback.format_exc())
             return None, (
                 f"❌ Error al generar el PDF combinado: {str(e)}"
@@ -1059,7 +1059,7 @@ def register_pdf_export_callbacks(app):
         prevent_initial_call=True
     )
     def toggle_weibull_pdf_modal(export_clicks, close_clicks, cancel_clicks):
-        """Abre/cierra el modal de exportación Weibull"""
+        """Open/close the Weibull export modal."""
         if not callback_context.triggered:
             return {'display': 'none'}, {'display': 'none'}
 
@@ -1085,7 +1085,7 @@ def register_pdf_export_callbacks(app):
         prevent_initial_call=True
     )
     def download_weibull_pdf(n_clicks, filename, options, ai_text_from_page, ai_text_language, df_json, language):
-        """Genera PDF de Weibull con datos REALES del dataset limpio"""
+        """Generate a Weibull PDF using ACTUAL data from the clean dataset."""
         try:
             if not filename or filename.strip() == '':
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -1181,7 +1181,7 @@ def register_pdf_export_callbacks(app):
             return dcc.send_file(pdf_path), "", {'display': 'none'}
 
         except Exception as e:
-            print(f"ERROR en download_weibull_pdf: {str(e)}")
+            print(f"""ERROR in download_weibull_pdf: {str(e)}""")
             print(traceback.format_exc())
             return None, (f"❌ Error al generar el PDF de Weibull: {str(e)}" if language == 'es' else f"❌ Error generating the Weibull PDF: {str(e)}"), {
                 'display': 'block',
@@ -1207,7 +1207,7 @@ def register_pdf_export_callbacks(app):
         prevent_initial_call=True
     )
     def toggle_exponential_pdf_modal(export_clicks, close_clicks, cancel_clicks):
-        """Abre o cierra el modal de exportacion PDF para el modelo exponencial."""
+        """Open or close the Exponential model PDF export modal."""
         if not callback_context.triggered:
             return {'display': 'none'}, {'display': 'none'}
 
@@ -1233,7 +1233,7 @@ def register_pdf_export_callbacks(app):
         prevent_initial_call=True
     )
     def download_exponential_pdf(n_clicks, filename, options, ai_text_from_page, ai_text_language, df_json, language):
-        """Genera y descarga el PDF del analisis exponencial con las opciones marcadas."""
+        """Generate and download the Exponential analysis PDF with the selected options."""
         try:
             if not filename or filename.strip() == '':
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -1331,7 +1331,7 @@ def register_pdf_export_callbacks(app):
             return dcc.send_file(pdf_path), "", {'display': 'none'}
 
         except Exception as e:
-            print(f"ERROR en download_exponential_pdf: {str(e)}")
+            print(f"""ERROR in download_exponential_pdf: {str(e)}""")
             print(traceback.format_exc())
             return None, (f"❌ Error al generar el PDF de Exponencial: {str(e)}" if language == 'es' else f"❌ Error generating the Exponential PDF: {str(e)}"), {
                 'display': 'block',
@@ -1357,7 +1357,7 @@ def register_pdf_export_callbacks(app):
         prevent_initial_call=True
     )
     def toggle_rsf_pdf_modal(export_clicks, close_clicks, cancel_clicks):
-        """Abre/cierra el modal de exportación RSF"""
+        """Open/close the RSF export modal."""
         if not callback_context.triggered:
             return {'display': 'none'}, {'display': 'none'}
 
@@ -1401,7 +1401,7 @@ def register_pdf_export_callbacks(app):
         df_json,
         language,
     ):
-        """Genera PDF de Random Survival Forest con datos reales del análisis actual"""
+        """Generate a Random Survival Forest PDF using actual data from the current analysis."""
         try:
             if not filename or filename.strip() == '':
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -1450,8 +1450,8 @@ def register_pdf_export_callbacks(app):
                     'fontWeight': 'bold'
                 }
 
-            # Usar la misma tabla que se pinta en el dashboard para que el PDF refleje exactamente
-            # el bloque "Resumen del modelo RSF" mostrado arriba.
+            # Use the same table displayed in the dashboard so the PDF matches
+            # the "RSF model summary" block shown above exactly.
             rsf_table_for_pdf = analysis['summary_df']
             if rsf_store_data and isinstance(rsf_store_data, dict) and rsf_store_data.get('summary_json'):
                 try:
@@ -1510,7 +1510,7 @@ def register_pdf_export_callbacks(app):
             try:
                 export_survival_analysis_to_pdf(**export_kwargs)
             except TypeError as type_error:
-                # Compatibilidad con recargas parciales en caliente (firma antigua de exportador en memoria).
+                # Support partial hot reloads with an older exporter signature in memory.
                 if "include_rsf_profile" not in str(type_error):
                     raise
 
@@ -1523,7 +1523,7 @@ def register_pdf_export_callbacks(app):
             return dcc.send_file(pdf_path), "", {'display': 'none'}
 
         except Exception as e:
-            print(f"ERROR en download_rsf_pdf: {str(e)}")
+            print(f"""ERROR in download_rsf_pdf: {str(e)}""")
             print(traceback.format_exc())
             return None, (f"❌ Error al generar el PDF de RSF: {str(e)}" if language == 'es' else f"❌ Error generating the RSF PDF: {str(e)}"), {
                 'display': 'block',
@@ -1539,7 +1539,7 @@ def register_pdf_export_callbacks(app):
 
 
 def _get_modal_styles(show=True):
-    """Helper para obtener estilos del modal"""
+    """Get modal styles."""
     if not show:
         return {'display': 'none'}, {'display': 'none'}
     

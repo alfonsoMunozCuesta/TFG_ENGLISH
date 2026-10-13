@@ -1,11 +1,10 @@
-peropeColoca en esta carpeta el ejecutable de llama.cpp utilizado para arrancar el
-servidor local de IA.
+Place the llama.cpp executable used to start the local AI server in this folder.
 
-Nombre esperado por defecto:
+Default expected filename:
 llama-server.exe
 
-Enlace de descarga:
+Download link:
 https://drive.google.com/file/d/1H3-fTrxCdiM9gZoL_5c38NETQeU0I__9/view?usp=drive_link
 
-El ejecutable no se incluye en el repositorio. Si se encuentra en otra ruta,
-hay que ajustar la variable LLAMA_SERVER antes de ejecutar START_LLAMA_SERVER.bat.
+The executable is not included in the repository. If it is located elsewhere,
+set the LLAMA_SERVER variable before running START_LLAMA_SERVER.bat.

@@ -42,7 +42,7 @@ PROFILE_CREDIT_LEVELS = {
 
 
 def _coerce_event_column(series: pd.Series) -> pd.Series:
-    """Convierte la columna de evento a valores binarios compatibles con supervivencia."""
+    """Convert the event column into binary values compatible with survival analysis."""
     numeric = pd.to_numeric(series, errors="coerce")
     if numeric.notna().any():
         return numeric.fillna(0).astype(int)
@@ -53,7 +53,7 @@ def _coerce_event_column(series: pd.Series) -> pd.Series:
 
 
 def _build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
-    """Prepara predictores, tiempo y evento para entrenar el modelo RSF."""
+    """Prepare predictors, time, and events for RSF model training."""
     if df is None or df.empty:
         return pd.DataFrame(), pd.Series(dtype=float), pd.Series(dtype=int)
 
@@ -91,7 +91,7 @@ def _build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd
 
 
 def _build_importance_proxy(feature_df: pd.DataFrame, risk_scores: np.ndarray) -> np.ndarray:
-    """Calcula una aproximacion de importancia correlacionando variables con el riesgo."""
+    """Approximate importance by correlating variables with risk."""
     correlations = []
     for column in feature_df.columns:
         series = pd.to_numeric(feature_df[column], errors="coerce").fillna(feature_df[column].median())
@@ -107,7 +107,7 @@ def _build_importance_proxy(feature_df: pd.DataFrame, risk_scores: np.ndarray) -
 
 
 def _fit_rsf_model(df: pd.DataFrame):
-    """Entrena el Random Survival Forest y devuelve sus datos auxiliares."""
+    """Train the Random Survival Forest and return its supporting data."""
     feature_df, durations, events = _build_feature_matrix(df)
     if feature_df.empty or durations.nunique() < 2:
         return None
@@ -144,7 +144,7 @@ def _fit_rsf_model(df: pd.DataFrame):
 
 
 def _build_profile_defaults(df: pd.DataFrame) -> dict:
-    """Obtiene valores por defecto razonables para simular perfiles individuales."""
+    """Get reasonable defaults for simulating individual profiles."""
     defaults = {}
     if df is None or df.empty:
         return defaults
@@ -166,7 +166,7 @@ def _build_profile_defaults(df: pd.DataFrame) -> dict:
 
 
 def _apply_profile_overrides(defaults: dict, profile: dict, df: pd.DataFrame) -> dict:
-    """Aplica las opciones elegidas por el usuario sobre el perfil base."""
+    """Apply the user's selected options to the base profile."""
     profile_values = dict(defaults)
 
     if "gender_F" in df.columns:
@@ -196,7 +196,7 @@ def _apply_profile_overrides(defaults: dict, profile: dict, df: pd.DataFrame) ->
 
 
 def _build_profile_feature_frame(df: pd.DataFrame, profile: dict, feature_columns: pd.Index) -> pd.DataFrame:
-    """Construye una fila de predictores compatible con el modelo para el perfil simulado."""
+    """Build a predictor row compatible with the model for the simulated profile."""
     defaults = _build_profile_defaults(df)
     profile_values = _apply_profile_overrides(defaults, profile, df)
     profile_df = pd.DataFrame([profile_values])
@@ -206,7 +206,7 @@ def _build_profile_feature_frame(df: pd.DataFrame, profile: dict, feature_column
     return profile_df
 
 
-def build_rsf_analysis(df: pd.DataFrame, language: str = 'es'):
+def build_rsf_analysis(df: pd.DataFrame, language: str = 'en'):
     """Fit a Random Survival Forest and build reusable outputs for the dashboard."""
     fitted = _fit_rsf_model(df)
     if not fitted:
@@ -279,7 +279,7 @@ def build_rsf_analysis(df: pd.DataFrame, language: str = 'es'):
     survival_curve_summaries = []
 
     def _hex_to_rgba(hex_color: str, alpha: float) -> str:
-        """Convierte colores hexadecimales en RGBA para sombrear intervalos en Plotly."""
+        """Convert hexadecimal colors to RGBA to shade intervals in Plotly."""
         hex_color = hex_color.lstrip("#")
         red = int(hex_color[0:2], 16)
         green = int(hex_color[2:4], 16)
@@ -439,7 +439,7 @@ def build_rsf_analysis(df: pd.DataFrame, language: str = 'es'):
     }
 
 
-def build_rsf_profile_analysis(df: pd.DataFrame, profile: dict, language: str = 'es'):
+def build_rsf_profile_analysis(df: pd.DataFrame, profile: dict, language: str = 'en'):
     """Fit RSF and build a survival curve for a single simulated profile."""
 
     fitted = _fit_rsf_model(df)

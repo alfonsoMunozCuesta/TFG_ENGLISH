@@ -1,8 +1,8 @@
 """
-Benchmark sencillo del modulo de IA local.
+Simple benchmark for the local AI module.
 
-Mide tiempos de respuesta contra el endpoint configurado en config.py y, en
-Windows, intenta estimar consumo de RAM/CPU del proceso llama-server.
+Measure response times against the endpoint configured in config.py and, on
+Windows, try to estimate RAM/CPU usage of the llama-server process.
 """
 
 from __future__ import annotations
@@ -24,111 +24,110 @@ from config import LLAMA_SERVER_URL, MODEL_NAME
 
 
 DEFAULT_PROMPT = (
-    "Interpreta de forma breve y academica estos resultados de supervivencia: "
-    "1200 estudiantes, 310 eventos de abandono, follow-up medio de 145 dias, "
-    "Hazard Ratio de 1.42 para creditos estudiados y p-valor de 0.03."
+    "Provide a brief academic interpretation of these survival results: "
+    "1200 students, 310 dropout events, mean follow-up of 145 days, "
+    "Hazard Ratio of 1.42 for studied credits and a p-value of 0.03."
 )
 
 TECHNIQUE_PROMPTS = [
     {
         "technique": "Kaplan-Meier",
         "prompt": (
-            "Interpreta de forma breve y academica un analisis Kaplan-Meier con "
-            "1200 estudiantes, 310 abandonos observados, supervivencia estimada "
-            "a los 100 dias de 0.82 y a los 200 dias de 0.69. La curva del grupo "
-            "con mas creditos estudiados desciende antes que la del resto."
+            "Provide a brief academic interpretation of a Kaplan-Meier analysis with "
+            "1200 students, 310 observed dropouts, and estimated survival "
+            "of 0.82 at 100 days and 0.69 at 200 days. The curve for the group "
+            "with more studied credits declines earlier than the others."
         ),
     },
     {
-        "technique": "Regresion de Cox",
+        "technique": "Cox Regression",
         "prompt": (
-            "Interpreta de forma breve y academica una regresion de Cox aplicada "
-            "al abandono academico. La variable creditos estudiados presenta un "
-            "Hazard Ratio de 1.42 con p-valor 0.03, edad 35-55 tiene Hazard Ratio "
-            "0.91 con p-valor 0.28 y discapacidad presenta Hazard Ratio 1.18 con "
-            "p-valor 0.12."
+            "Provide a brief academic interpretation of Cox regression applied "
+            "to academic dropout. The studied credits variable has a "
+            "Hazard Ratio of 1.42 with p-value 0.03, age 35-55 has Hazard Ratio "
+            "0.91 with p-value 0.28, and disability has Hazard Ratio 1.18 with "
+            "p-value 0.12."
         ),
     },
     {
-        "technique": "Test Log-Rank",
+        "technique": "Log-Rank Test",
         "prompt": (
-            "Interpreta de forma breve y academica un Test Log-Rank que compara "
-            "curvas de supervivencia por nivel educativo previo. El estadistico "
-            "de prueba es 12.84 y el p-valor es 0.004. Las curvas muestran una "
-            "separacion visible entre grupos a partir de la mitad del seguimiento."
+            "Provide a brief academic interpretation of a Log-Rank test comparing "
+            "survival curves by prior education level. The test "
+            "statistic is 12.84 and the p-value is 0.004. The curves show "
+            "visible separation between groups from the midpoint of follow-up."
         ),
     },
     {
         "technique": "Weibull",
         "prompt": (
-            "Interpreta de forma breve y academica un modelo Weibull para abandono "
-            "academico. El parametro de forma rho es 1.31, la mediana de supervivencia "
-            "estimada es 176 dias, el log-likelihood es -842.5 y el AIC es 1689.0. "
-            "El riesgo parece aumentar ligeramente con el tiempo."
+            "Provide a brief academic interpretation of a Weibull model for academic "
+            "dropout. The shape parameter rho is 1.31, estimated median survival "
+            "is 176 days, log-likelihood is -842.5, and AIC is 1689.0. "
+            "Risk appears to increase slightly over time."
         ),
     },
     {
-        "technique": "Exponencial",
+        "technique": "Exponential",
         "prompt": (
-            "Interpreta de forma breve y academica un modelo Exponencial para "
-            "abandono academico. El parametro lambda estimado es 0.0048, la mediana "
-            "de supervivencia es 144 dias, el log-likelihood es -861.2 y el AIC es "
-            "1724.4. El modelo asume riesgo constante durante el seguimiento."
+            "Provide a brief academic interpretation of an Exponential model for "
+            "academic dropout. The estimated lambda parameter is 0.0048, median "
+            "survival is 144 days, log-likelihood is -861.2, and AIC is "
+            "1724.4. The model assumes constant risk during follow-up."
         ),
     },
     {
         "technique": "Random Survival Forest",
         "prompt": (
-            "Interpreta de forma breve y academica un Random Survival Forest aplicado "
-            "al abandono academico. El indice de concordancia es 0.71, la puntuacion "
-            "out-of-bag es 0.66 y las variables mas importantes son creditos estudiados, "
-            "edad y nivel educativo previo. Los perfiles de alto riesgo muestran una "
-            "curva de supervivencia claramente inferior."
+            "Provide a brief academic interpretation of a Random Survival Forest applied "
+            "to academic dropout. The concordance index is 0.71, the "
+            "out-of-bag score is 0.66, and the most important variables are studied credits, "
+            "age, and prior education level. High-risk profiles show "
+            "clearly lower survival curves."
         ),
     },
 ]
 
 
 def _parse_args() -> argparse.Namespace:
-    """Define y lee los argumentos de consola para configurar el benchmark de IA."""
+    """Define and parse command-line arguments for the AI benchmark."""
     parser = argparse.ArgumentParser(
-        description="Mide tiempos y consumo aproximado del servidor local de IA."
+        description="Measure response times and approximate resource usage of the local AI server."
     )
     parser.add_argument(
         "--mode",
         choices=("techniques", "repeat"),
         default="techniques",
         help=(
-            "techniques mide una consulta por tecnica; repeat repite el mismo "
-            "prompt varias veces."
+            "techniques measures one query per technique; repeat sends the same prompt several times."
         ),
     )
     parser.add_argument(
         "--runs",
         type=int,
         default=5,
-        help="Repeticiones por tecnica en modo techniques, o numero de consultas en modo repeat.",
+        help="Repetitions per technique in techniques mode, or number of queries in repeat mode.",
     )
-    parser.add_argument("--warmup", type=int, default=1, help="Consultas previas no medidas.")
-    parser.add_argument("--timeout", type=int, default=180, help="Timeout por consulta en segundos.")
-    parser.add_argument("--endpoint", default=LLAMA_SERVER_URL, help="Endpoint compatible con chat completions.")
-    parser.add_argument("--model", default=MODEL_NAME, help="Nombre del modelo que recibira el endpoint.")
-    parser.add_argument("--prompt", default=DEFAULT_PROMPT, help="Prompt usado en cada consulta.")
+    parser.add_argument("--warmup", type=int, default=1, help="Unmeasured warmup queries.")
+    parser.add_argument("--timeout", type=int, default=180, help="Timeout per query in seconds.")
+    parser.add_argument("--endpoint", default=LLAMA_SERVER_URL, help="Chat completions compatible endpoint.")
+    parser.add_argument("--model", default=MODEL_NAME, help="Model name sent to the endpoint.")
+    parser.add_argument("--prompt", default=DEFAULT_PROMPT, help="Prompt used for each query.")
     parser.add_argument(
         "--process-name",
         default="llama-server",
-        help="Nombre del proceso que se usara para estimar RAM/CPU.",
+        help="Process name used to estimate RAM/CPU usage.",
     )
     parser.add_argument(
         "--out-dir",
         default="benchmarks",
-        help="Carpeta donde se guardaran CSV y JSON con los resultados.",
+        help="Directory for CSV and JSON results.",
     )
     return parser.parse_args()
 
 
 def _query_process_snapshot(process_name: str) -> dict | None:
-    """Devuelve CPU acumulada y RAM del proceso en Windows, si se encuentra."""
+    """Return accumulated CPU time and RAM usage for a Windows process, if found."""
     if platform.system().lower() != "windows":
         return None
 
@@ -169,15 +168,15 @@ def _query_process_snapshot(process_name: str) -> dict | None:
 
 
 def _build_payload(prompt: str, model: str) -> dict:
-    """Construye el cuerpo JSON que se envia al endpoint del modelo."""
+    """Build the JSON body sent to the model endpoint."""
     return {
         "model": model,
         "messages": [
             {
                 "role": "system",
                 "content": (
-                    "Eres un asistente academico que interpreta resultados de "
-                    "analisis de supervivencia de forma clara, prudente y breve."
+                    "You are an academic assistant who interprets "
+                    "survival analysis results clearly, cautiously, and briefly."
                 ),
             },
             {"role": "user", "content": prompt},
@@ -190,7 +189,7 @@ def _build_payload(prompt: str, model: str) -> dict:
 
 
 def _call_model(prompt: str, timeout: int, endpoint: str, model: str) -> tuple[str, float]:
-    """Llama al modelo, mide el tiempo de respuesta y devuelve el texto generado."""
+    """Call the model, measure response time, and return the generated text."""
     start = time.perf_counter()
     response = requests.post(endpoint, json=_build_payload(prompt, model), timeout=timeout)
     elapsed = time.perf_counter() - start
@@ -210,7 +209,7 @@ def _run_once(
     model: str,
     technique: str,
 ) -> dict:
-    """Ejecuta una prueba individual del benchmark y registra metricas del sistema."""
+    """Run one benchmark trial and record system metrics."""
     before = _query_process_snapshot(process_name)
     content, elapsed = _call_model(prompt, timeout, endpoint, model)
     after = _query_process_snapshot(process_name)
@@ -237,7 +236,7 @@ def _run_once(
 
 
 def _save_results(results: list[dict], args: argparse.Namespace, summary: dict) -> tuple[Path, Path]:
-    """Guarda los resultados detallados y el resumen del benchmark en disco."""
+    """Save detailed results and the benchmark summary to disk."""
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -266,7 +265,7 @@ def _save_results(results: list[dict], args: argparse.Namespace, summary: dict) 
 
 
 def _build_summary(results: list[dict]) -> dict:
-    """Resume las metricas principales obtenidas en todas las ejecuciones."""
+    """Summarize the main metrics across all runs."""
     times = [row["elapsed_seconds"] for row in results]
     cpu_values = [row["cpu_percent_approx"] for row in results if row["cpu_percent_approx"] is not None]
     ram_values = [row["ram_mb_approx"] for row in results if row["ram_mb_approx"] is not None]
@@ -285,7 +284,7 @@ def _build_summary(results: list[dict]) -> dict:
 
 
 def _build_tasks(args: argparse.Namespace) -> list[dict]:
-    """Prepara la lista de tareas que se lanzaran durante el benchmark."""
+    """Prepare the list of tasks to run during the benchmark."""
     if args.mode == "repeat":
         return [
             {
@@ -312,19 +311,19 @@ def _build_tasks(args: argparse.Namespace) -> list[dict]:
 
 
 def main() -> int:
-    """Orquesta el benchmark completo desde los argumentos hasta los ficheros finales."""
+    """Orchestrate the complete benchmark from arguments to output files."""
     args = _parse_args()
 
     if args.runs <= 0:
-        print("ERROR: --runs debe ser mayor que 0.")
+        print("ERROR: --runs must be greater than 0.")
         return 1
 
-    print("Benchmark IA local")
+    print("Local AI benchmark")
     print(f"Endpoint: {args.endpoint}")
-    print(f"Modelo:   {args.model}")
-    print(f"Modo:     {args.mode}")
+    print(f"""Model:    {args.model}""")
+    print(f"""Mode:     {args.mode}""")
     if args.mode == "techniques":
-        print(f"Consultas: {len(TECHNIQUE_PROMPTS)} tecnicas x {args.runs} repeticion(es)")
+        print(f"""Queries: {len(TECHNIQUE_PROMPTS)} techniques x {args.runs} repetition(s)""")
     else:
         print(f"Runs:     {args.runs} (+ {args.warmup} warmup)")
     print()
@@ -334,9 +333,9 @@ def main() -> int:
             print(f"Warmup {index + 1}/{args.warmup}...")
             _call_model(args.prompt, args.timeout, args.endpoint, args.model)
     except Exception as exc:
-        print("ERROR: no se pudo contactar con el servidor de IA.")
-        print(f"Detalle: {exc}")
-        print("Comprueba que START_LLAMA_SERVER.bat esta ejecutandose.")
+        print("ERROR: could not contact the AI server.")
+        print(f"""Details: {exc}""")
+        print("Check that START_LLAMA_SERVER.bat is running.")
         return 1
 
     tasks = _build_tasks(args)
@@ -355,7 +354,7 @@ def main() -> int:
             )
         except Exception as exc:
             print("ERROR")
-            print(f"Detalle: {exc}")
+            print(f"""Details: {exc}""")
             return 1
         results.append(row)
         print(f"{row['elapsed_seconds']} s")
@@ -364,13 +363,13 @@ def main() -> int:
     csv_path, json_path = _save_results(results, args, summary)
 
     print()
-    print("Resumen")
-    print(f"- Tiempo medio:  {summary['time_mean_seconds']} s")
-    print(f"- Tiempo maximo: {summary['time_max_seconds']} s")
-    print(f"- RAM aprox.:    {summary['ram_mb_max_approx'] or 'N/A'} MB")
-    print(f"- CPU aprox.:    {summary['cpu_percent_mean_approx'] or 'N/A'} % medio")
+    print("Summary")
+    print(f"""- Mean time:     {summary['time_mean_seconds']} s""")
+    print(f"""- Maximum time:  {summary['time_max_seconds']} s""")
+    print(f"""- Approx. RAM:   {summary['ram_mb_max_approx'] or 'N/A'} MB""")
+    print(f"""- Approx. CPU:   {summary['cpu_percent_mean_approx'] or 'N/A'} % mean""")
     print()
-    print("Detalle por tecnica")
+    print("Details by technique")
     for row in results:
         print(
             f"- {row['technique']}: {row['elapsed_seconds']} s, "
