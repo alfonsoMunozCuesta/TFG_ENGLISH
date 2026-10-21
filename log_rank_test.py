@@ -10,6 +10,7 @@ from translations import localize_figure
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+from translations import get_covariate_label, get_group_label
 
 # Map interface covariate names to actual columns.
 # Variables with multiple categories are one-hot encoded in the CSV.
@@ -311,6 +312,42 @@ def _perform_log_rank_multicategory(df, group_by, columns, alpha: float = 0.05):
     return pd.DataFrame(results)
 
 
+def localize_logrank_results(result, language='en'):
+    """Translate result labels without modifying statistical values."""
+    localized = result.copy()
+    for column in ('Grupo A', 'Grupo B'):
+        if column in localized.columns:
+            localized[column] = localized[column].astype(object)
+    decisions = {'Rechazar H0': 'Reject H0', 'No rechazar H0': 'Do not reject H0', 'No evaluable': 'Not evaluable'}
+    conclusions = {
+        'Hay diferencias significativas entre las curvas': 'There are significant differences between the curves',
+        'No se observan diferencias significativas entre las curvas': 'No significant differences are observed between the curves',
+        'Hay diferencias significativas': 'There are significant differences',
+        'No hay diferencias significativas': 'There are no significant differences',
+        'La covariable no tiene exactamente dos grupos.': 'The covariate does not have exactly two groups.',
+    }
+    for index, row in result.iterrows():
+        covariable, separator, comparison = str(row['Covariable']).partition(': ')
+        for column in ('Grupo A', 'Grupo B'):
+            if column in result.columns and pd.notna(row[column]):
+                localized.at[index, column] = get_group_label(language, covariable, row[column])
+        label = get_covariate_label(language, covariable)
+        if separator:
+            comparison = ' vs '.join(get_group_label(language, covariable, group) for group in comparison.split(' vs '))
+            label += ': ' + comparison
+        localized.at[index, 'Covariable'] = label
+        if language == 'en':
+            if 'Decisión' in result.columns:
+                localized.at[index, 'Decisión'] = decisions.get(row['Decisión'], row['Decisión'])
+            if 'Conclusión' in result.columns:
+                conclusion = row['Conclusión']
+                if isinstance(conclusion, str) and conclusion.startswith('Grupo vacío: '):
+                    group = conclusion[len('Grupo vacío: '):].removesuffix(' (n=0)')
+                    conclusion = f"Empty group: {get_group_label(language, covariable, group)} (n=0)"
+                localized.at[index, 'Conclusión'] = conclusions.get(conclusion, conclusion)
+    return localized
+
+
 def create_logrank_figure(df, group_by, language='en'):
     """
     Create a Plotly chart with Kaplan-Meier curves for Log-Rank comparison.
@@ -323,6 +360,12 @@ def create_logrank_figure(df, group_by, language='en'):
         go.Figure: Plotly figure containing survival curves.
     """
     try:
+        is_en = language == 'en'
+        hovertemplate = (
+            '<b>%{fullData.name}</b><br>Time: %{x:.0f}<br>Survival: %{y:.3f}<extra></extra>'
+            if is_en else
+            '<b>%{fullData.name}</b><br>Tiempo: %{x:.0f}<br>Supervivencia: %{y:.3f}<extra></extra>'
+        )
         if df is None or df.empty:
             print("[LOGRANK FIGURE] Error: Empty DataFrame")
             return None
@@ -349,11 +392,11 @@ def create_logrank_figure(df, group_by, language='en'):
                 value_to_group = {val: i for i, val in enumerate(unique_vals)}
                 df_temp['group'] = df_temp['studied_credits'].map(value_to_group)
                 groups = sorted(df_temp['group'].unique())
-                labels = [f"Grupo {i+1} ({unique_vals[i]:.0f} créditos)" for i in groups]
+                labels = [f"Group {i+1} ({unique_vals[i]:.0f} credits)" if is_en else f"Grupo {i+1} ({unique_vals[i]:.0f} créditos)" for i in groups]
             else:
                 df_temp['group'] = pd.qcut(df_temp['studied_credits'], q=5, labels=False, duplicates='drop')
                 groups = sorted(df_temp['group'].unique())
-                labels = [f"Quintil {i+1}" for i in groups]
+                labels = [f"Quintile {i+1}" if is_en else f"Quintil {i+1}" for i in groups]
 
             for i, group_val in enumerate(groups):
                 group_df = df_temp[df_temp['group'] == group_val]
@@ -365,13 +408,13 @@ def create_logrank_figure(df, group_by, language='en'):
                         mode='lines',
                         name=labels[i],
                         line=dict(color=colors[i % len(colors)], width=2),
-                        hovertemplate='<b>%{fullData.name}</b><br>Tiempo: %{x:.0f}<br>Supervivencia: %{y:.3f}<extra></extra>'
+                        hovertemplate=hovertemplate
                     ))
 
         # One-hot variables with multiple categories (age_band, highest_education).
         elif len(columns_presentes) > 1:
             for i, col in enumerate(columns_presentes):
-                label = col.split('_', 1)[1] if '_' in col else col
+                label = get_covariate_label(language, col)
                 group_df = df[df[col] == 1]
                 if len(group_df) > 0:
                     kmf.fit(group_df['date'], event_observed=group_df['final_result'], label=f"{label} (n={len(group_df)})")
@@ -381,7 +424,7 @@ def create_logrank_figure(df, group_by, language='en'):
                         mode='lines',
                         name=f"{label} (n={len(group_df)})",
                         line=dict(color=colors[i % len(colors)], width=2),
-                        hovertemplate='<b>%{fullData.name}</b><br>Tiempo: %{x:.0f}<br>Supervivencia: %{y:.3f}<extra></extra>'
+                        hovertemplate=hovertemplate
                     ))
                 else:
                     fig.add_trace(go.Scatter(
@@ -406,16 +449,16 @@ def create_logrank_figure(df, group_by, language='en'):
                         x=kmf.timeline.tolist(),
                         y=kmf.survival_function_.iloc[:, 0].tolist(),
                         mode='lines',
-                        name=f"{group_val} (n={len(group_df)})",
+                        name=f"{get_group_label(language, group_by, group_val)} (n={len(group_df)})",
                         line=dict(color=colors[i % len(colors)], width=2),
-                        hovertemplate='<b>%{fullData.name}</b><br>Tiempo: %{x:.0f}<br>Supervivencia: %{y:.3f}<extra></extra>'
+                        hovertemplate=hovertemplate
                     ))
 
         # Configure the layout.
         fig.update_layout(
-            title=f"Curvas Kaplan-Meier - {group_by}",
-            xaxis_title="Tiempo (meses)",
-            yaxis_title="Función de Supervivencia",
+            title=f"{'Kaplan-Meier Curves' if is_en else 'Curvas Kaplan-Meier'} - {get_covariate_label(language, group_by)}",
+            xaxis_title="Time (months)" if is_en else "Tiempo (meses)",
+            yaxis_title="Survival Function" if is_en else "Función de Supervivencia",
             hovermode='x unified',
             plot_bgcolor='rgba(240,240,240,0.5)',
             width=1200,

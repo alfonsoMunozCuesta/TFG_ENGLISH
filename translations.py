@@ -120,6 +120,15 @@ translations = {
         'edad_banda': 'Banda de Edad',
         'educacion_mas_alta': 'Educación Más Alta',
         'creditos_estudiados': 'Créditos Estudiados',
+        'edad_0_35': '0-35 años',
+        'edad_35_55': '35-55 años',
+        'edad_55_mas': '55+ años',
+        'educacion_a_level': 'A Level o equivalente',
+        'educacion_superior': 'Titulación de educación superior',
+        'educacion_inferior_a_level': 'Inferior a A Level',
+        'educacion_posgrado': 'Posgrado',
+        'educacion_sin_titulacion': 'Sin titulación formal',
+        'identificador_estudiante': 'Identificador del estudiante',
         
         # Kaplan-Meier
         'curva_supervivencia': 'Curva de Supervivencia Kaplan-Meier',
@@ -322,6 +331,15 @@ translations = {
         'edad_banda': 'Age Band',
         'educacion_mas_alta': 'Highest Education',
         'creditos_estudiados': 'Studied Credits',
+        'edad_0_35': '0-35 years',
+        'edad_35_55': '35-55 years',
+        'edad_55_mas': '55+ years',
+        'educacion_a_level': 'A Level or Equivalent',
+        'educacion_superior': 'HE Qualification',
+        'educacion_inferior_a_level': 'Lower Than A Level',
+        'educacion_posgrado': 'Post Graduate Qualification',
+        'educacion_sin_titulacion': 'No Formal Qualifications',
+        'identificador_estudiante': 'Student ID',
         'abandono_discapacidad': 'Dropout by Disability',
         'survival_analysis_prefix': 'Survival Analysis: {name}',
         
@@ -509,6 +527,108 @@ def localize_figure(figure, language):
         if getattr(trace, 'hovertemplate', None):
             trace.hovertemplate = get_display_text(language, trace.hovertemplate)
     return figure
+
+
+def get_covariate_label(language, covariable):
+    """Translate chart labels without changing column names."""
+    label_keys = {
+        'gender_F': 'genero',
+        'disability_N': 'discapacidad',
+        'age_band': 'edad_banda',
+        'highest_education': 'educacion_mas_alta',
+        'studied_credits': 'creditos_estudiados',
+        'id_student': 'identificador_estudiante',
+        'age_band_0-35': 'edad_0_35',
+        'age_band_35-55': 'edad_35_55',
+        'age_band_55<=': 'edad_55_mas',
+        'highest_education_A Level or Equivalent': 'educacion_a_level',
+        'highest_education_HE Qualification': 'educacion_superior',
+        'highest_education_Lower Than A Level': 'educacion_inferior_a_level',
+        'highest_education_Post Graduate Qualification': 'educacion_posgrado',
+        'highest_education_No Formal quals': 'educacion_sin_titulacion',
+    }
+    key = label_keys.get(covariable)
+    return get_translation(language, key) if key else covariable
+
+
+def get_feature_label(language, feature):
+    """Label a predictor while preserving the meaning of its binary indicators."""
+    if feature in ('gender_F', 'disability_N'):
+        category = 'femenino' if feature == 'gender_F' else 'sin_discapacidad'
+        return f"{get_covariate_label(language, feature)}: {get_translation(language, category)}"
+    for prefix, covariable in (('age_band_', 'age_band'), ('highest_education_', 'highest_education')):
+        if feature.startswith(prefix):
+            return f"{get_covariate_label(language, covariable)}: {get_covariate_label(language, feature)}"
+    return get_covariate_label(language, feature)
+
+
+def get_group_label(language, covariable, group):
+    """Translate group labels while preserving the codes stored in the data."""
+    binary_keys = {
+        'gender_F': {0: 'masculino', 1: 'femenino'},
+        'disability_N': {0: 'con_discapacidad', 1: 'sin_discapacidad'},
+    }
+    if covariable in binary_keys:
+        key = binary_keys[covariable].get(group)
+        if key:
+            return get_translation(language, key)
+    label = str(group)
+    if covariable == 'age_band' and not label.startswith('age_band_'):
+        label = 'age_' + label if label.startswith('band_') else 'age_band_' + label
+    elif covariable == 'highest_education' and not label.startswith('highest_education_'):
+        label = 'highest_' + label if label.startswith('education_') else 'highest_education_' + label
+    elif covariable == 'studied_credits' and language == 'en':
+        label = label.replace('Quintil ', 'Quintile ')
+    return get_covariate_label(language, label)
+
+
+def get_result_column_label(language, column):
+    """Translate result headers without changing column identifiers."""
+    labels = {
+        'en': {'Covariable': 'Covariate', 'Grupo A': 'Group A', 'Grupo B': 'Group B',
+               'Decisión': 'Decision', 'Conclusión': 'Conclusion', 'Estado': 'Status',
+               'test_statistic': 'Test statistic', 'p_value': 'p-value'},
+        'es': {'test_statistic': 'Estadístico', 'p_value': 'p-valor',
+               'Coef. lower 95%': 'Coef. inferior 95%', 'Coef. upper 95%': 'Coef. superior 95%',
+               'exp(Coef.) lower 95%': 'HR inferior 95%', 'exp(Coef.) upper 95%': 'HR superior 95%',
+               'cmp to': 'Comparación'},
+    }
+    return labels.get(language, labels['es']).get(column, column)
+
+
+def get_plotly_config(language, **options):
+    """Apply the selected language to Plotly controls and formats."""
+    config = {'locale': 'en' if language == 'en' else 'es'}
+    if language != 'en':
+        config['locales'] = {'es': {
+            'dictionary': {
+                'Autoscale': 'Ajustar escala', 'Box Select': 'Seleccionar con un rectángulo',
+                'Compare data on hover': 'Comparar datos al pasar el cursor',
+                'Double-click on legend to isolate one trace': 'Haz doble clic en la leyenda para aislar una serie',
+                'Double-click to zoom back out': 'Haz doble clic para restaurar la escala',
+                'Download plot as a png': 'Descargar gráfica como PNG', 'Download plot': 'Descargar gráfica',
+                'Lasso Select': 'Seleccionar con un lazo', 'Pan': 'Desplazar',
+                'Produced with Plotly.js': 'Creado con Plotly.js', 'Reset': 'Restablecer',
+                'Reset axes': 'Restablecer ejes', 'Reset view': 'Restablecer vista',
+                'Reset views': 'Restablecer vistas',
+                'Show closest data on hover': 'Mostrar el dato más cercano al pasar el cursor',
+                'Snapshot succeeded': 'Imagen guardada',
+                'Sorry, there was a problem downloading your snapshot!': 'No se ha podido descargar la imagen',
+                'Taking snapshot - this may take a few seconds': 'Preparando la imagen...',
+                'Toggle Spike Lines': 'Mostrar u ocultar guías',
+                'Toggle show closest data on hover': 'Mostrar u ocultar el dato más cercano',
+                'Zoom': 'Ampliar o reducir', 'Zoom in': 'Ampliar', 'Zoom out': 'Reducir',
+            },
+            'format': {
+                'days': ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+                'shortDays': ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+                'months': ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+                'shortMonths': ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                'date': '%d/%m/%Y', 'decimal': ',', 'thousands': '.',
+            },
+        }}
+    config.update(options)
+    return config
 
 
 def get_translation(lang, key):

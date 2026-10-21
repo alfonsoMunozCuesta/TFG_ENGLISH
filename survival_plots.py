@@ -9,6 +9,7 @@ import numpy as np
 from lifelines import KaplanMeierFitter
 from translations import get_display_text
 from dash import dcc, html
+from translations import get_covariate_label, get_feature_label, get_group_label, get_plotly_config
 
 # Map parameters to actual columns.
 COVARIABLE_MAPPING = {
@@ -21,21 +22,6 @@ COVARIABLE_MAPPING = {
                          'highest_education_Post Graduate Qualification'],
     'studied_credits': ['studied_credits']
 }
-
-# Map readable labels.
-LABEL_MAPPING = {
-    'gender_F': 'Género',
-    'disability_N': 'Discapacidad',
-    'age_band_0-35': '0-35 años',
-    'age_band_35-55': '35-55 años',
-    'age_band_55<=': '55+ años',
-    'highest_education_A Level or Equivalent': 'A Level',
-    'highest_education_HE Qualification': 'HE Qualification',
-    'highest_education_Lower Than A Level': 'Lower Than A Level',
-    'highest_education_Post Graduate Qualification': 'Postgrado',
-    'studied_credits': 'Créditos Estudiados'
-}
-
 
 def plot_logrank_curves(df, covariable, language='en'):
     """
@@ -118,8 +104,8 @@ def plot_logrank_curves(df, covariable, language='en'):
         # Iterate over ALL mapped columns, even if absent from the current dataframe.
         groups_info = []
         for col in columns:
-            # Extract the label directly from the mapping.
-            label = get_display_text(language, LABEL_MAPPING.get(col, col.split('_', 1)[1] if '_' in col else col))
+            # Resolve the group label in the selected language.
+            label = get_covariate_label(language, col)
             
             # Get data if the column exists; otherwise use an empty dataframe.
             if col in df.columns:
@@ -191,7 +177,7 @@ def plot_logrank_curves(df, covariable, language='en'):
     else:
         col = columns[0]
         groups = sorted(df[col].dropna().unique())
-        labels = [f"{get_display_text(language, LABEL_MAPPING.get(col, col))}: {vals}" for vals in groups]
+        labels = [get_group_label(language, covariable, value) for value in groups]
         
         for i, group_val in enumerate(groups):
             df_group = df[df[col] == group_val]
@@ -235,9 +221,9 @@ def plot_logrank_curves(df, covariable, language='en'):
     
     fig.update_layout(
         title=(
-            f"Survival Curves (Kaplan-Meier) - {get_display_text(language, LABEL_MAPPING.get(covariable, covariable))}"
+            f"Survival Curves (Kaplan-Meier) - {get_covariate_label(language, covariable)}"
             if is_en else
-            f"Curvas de Supervivencia (Kaplan-Meier) - {get_display_text(language, LABEL_MAPPING.get(covariable, covariable))}"
+            f"Curvas de Supervivencia (Kaplan-Meier) - {get_covariate_label(language, covariable)}"
         ),
         xaxis_title="Time" if is_en else "Tiempo",
         yaxis_title="Survival Probability" if is_en else "Probabilidad de Supervivencia",
@@ -246,7 +232,7 @@ def plot_logrank_curves(df, covariable, language='en'):
         template='plotly_white'
     )
     
-    return dcc.Graph(figure=fig)
+    return dcc.Graph(figure=fig, config=get_plotly_config(language))
 
 
 def plot_cox_hazard_ratios(summary_df, covariable_name, language='en'):
@@ -280,7 +266,7 @@ def plot_cox_hazard_ratios(summary_df, covariable_name, language='en'):
     is_en = language == 'en'
 
     if summary_df.empty:
-        return dcc.Graph(figure=go.Figure().add_annotation(text="Could not compute Hazard Ratios" if is_en else "No se pudieron calcular Hazard Ratios"))
+        return dcc.Graph(figure=go.Figure().add_annotation(text="Could not compute Hazard Ratios" if is_en else "No se pudieron calcular Hazard Ratios"), config=get_plotly_config(language))
     
     fig = go.Figure()
     
@@ -297,7 +283,7 @@ def plot_cox_hazard_ratios(summary_df, covariable_name, language='en'):
     
     # Add points and error bars.
     for idx, (i, row) in enumerate(summary_df.iterrows()):
-        var_name = str(row[var_col]) if var_col in row and pd.notna(row[var_col]) else f"Var {idx}"
+        var_name = get_feature_label(language, str(row[var_col])) if var_col in row and pd.notna(row[var_col]) else f"Var {idx}"
         y_labels.append(var_name)
         
         fig.add_trace(go.Scatter(
@@ -306,7 +292,7 @@ def plot_cox_hazard_ratios(summary_df, covariable_name, language='en'):
             mode='markers',
             marker=dict(size=12, color=colors[idx]),
             name=var_name,
-            hovertemplate=f"<b>{var_name}</b><br>HR: %{{x:.3f}}<br>IC 95%: ({row['HR_lower']:.3f} - {row['HR_upper']:.3f})<extra></extra>"
+            hovertemplate=f"<b>{var_name}</b><br>HR: %{{x:.3f}}<br>{'95% CI' if is_en else 'IC 95%'}: ({row['HR_lower']:.3f} - {row['HR_upper']:.3f})<extra></extra>"
         ))
         
         # Error bars (horizontal lines).
@@ -320,7 +306,7 @@ def plot_cox_hazard_ratios(summary_df, covariable_name, language='en'):
         ))
     
     fig.update_layout(
-        title=f"Forest Plot - Hazard Ratios (Cox Regression)",
+        title="Forest Plot - Hazard Ratios (Cox Regression)" if is_en else "Forest Plot - Hazard Ratios (Regresión de Cox)",
         xaxis_title="Hazard Ratio (log scale)" if is_en else "Hazard Ratio (escala logarítmica)",
         yaxis_title="Variables" if is_en else "Variables",
         yaxis=dict(
@@ -336,4 +322,4 @@ def plot_cox_hazard_ratios(summary_df, covariable_name, language='en'):
         showlegend=False
     )
     
-    return dcc.Graph(figure=fig)
+    return dcc.Graph(figure=fig, config=get_plotly_config(language))

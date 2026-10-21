@@ -6,6 +6,8 @@ setlocal enabledelayedexpansion
 set "PROJECT_DIR=%~dp0"
 set "DEFAULT_MODEL_PATH=%PROJECT_DIR%models\qwen2.5-1.5b-instruct-q4_k_m.gguf"
 set "DEFAULT_LLAMA_SERVER=%PROJECT_DIR%tools\llama.cpp\llama-server.exe"
+set "COURSE_MODEL_PATH=%USERPROFILE%\Desktop\ING_INF\4\IA\qwen2.5-1.5b-instruct-q4_k_m.gguf"
+set "COURSE_LLAMA_SERVER=%USERPROFILE%\Desktop\ING_INF\4\IA\llama.cpp\llama-server.exe"
 set "LEGACY_MODEL_PATH=%USERPROFILE%\Desktop\IA\qwen2.5-1.5b-instruct-q4_k_m.gguf"
 set "LEGACY_LLAMA_SERVER=%USERPROFILE%\Desktop\IA\llama.cpp\llama-server.exe"
 
@@ -15,6 +17,8 @@ REM   set LLAMA_SERVER=C:\path\to\llama-server.exe
 if "%MODEL_PATH%"=="" (
     if exist "%DEFAULT_MODEL_PATH%" (
         set "MODEL_PATH=%DEFAULT_MODEL_PATH%"
+    ) else if exist "%COURSE_MODEL_PATH%" (
+        set "MODEL_PATH=%COURSE_MODEL_PATH%"
     ) else if exist "%LEGACY_MODEL_PATH%" (
         set "MODEL_PATH=%LEGACY_MODEL_PATH%"
     ) else (
@@ -25,6 +29,8 @@ if "%MODEL_PATH%"=="" (
 if "%LLAMA_SERVER%"=="" (
     if exist "%DEFAULT_LLAMA_SERVER%" (
         set "LLAMA_SERVER=%DEFAULT_LLAMA_SERVER%"
+    ) else if exist "%COURSE_LLAMA_SERVER%" (
+        set "LLAMA_SERVER=%COURSE_LLAMA_SERVER%"
     ) else if exist "%LEGACY_LLAMA_SERVER%" (
         set "LLAMA_SERVER=%LEGACY_LLAMA_SERVER%"
     ) else (

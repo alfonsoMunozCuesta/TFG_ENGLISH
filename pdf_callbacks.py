@@ -209,7 +209,7 @@ def register_pdf_export_callbacks(app):
                     kmf = KaplanMeierFitter()
                     kmf.fit(df['date'], event_observed=df['final_result'])
                     km_table = kmf.survival_function_.reset_index()
-                    km_table.columns = ['Tiempo', 'Supervivencia']
+                    km_table.columns = ['Time', 'Survival'] if language == 'en' else ['Tiempo', 'Supervivencia']
                 except Exception as e:
                     print(f"""[KM PDF] Error generating KM table: {e}""")
                     km_table = None
@@ -1453,7 +1453,7 @@ def register_pdf_export_callbacks(app):
             # Use the same table displayed in the dashboard so the PDF matches
             # the "RSF model summary" block shown above exactly.
             rsf_table_for_pdf = analysis['summary_df']
-            if rsf_store_data and isinstance(rsf_store_data, dict) and rsf_store_data.get('summary_json'):
+            if rsf_store_data and isinstance(rsf_store_data, dict) and rsf_store_data.get('summary_json') and rsf_store_data.get('language') == language:
                 try:
                     rsf_table_for_pdf = pd.read_json(rsf_store_data['summary_json'], orient='split')
                 except Exception:

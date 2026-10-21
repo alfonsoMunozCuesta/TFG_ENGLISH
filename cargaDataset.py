@@ -201,9 +201,10 @@ def update_confirm_message(language):
     Output('page-content', 'children'),
     [Input('url', 'pathname'),
      Input('language-store', 'data')],
-    [State('df-store', 'data')]
+    [State('df-store', 'data'),
+     State('km-current-variable', 'data')]
 )
-def display_page(pathname, language, df_json):
+def display_page(pathname, language, df_json, km_current_variable):
     """Select the dashboard page to display for the current route."""
     dataset_loaded = df_json is not None
 
@@ -218,7 +219,7 @@ def display_page(pathname, language, df_json):
     elif pathname == '/survival-analysis':
         return create_survival_analysis_page(language)
     elif pathname == '/survival-analysis/kaplan-meier':
-        return create_kaplan_meier_page(language)
+        return create_kaplan_meier_page(language, current_variable=km_current_variable, df_json=df_json)
     elif pathname == '/survival-analysis/cox-regression':
         return create_cox_regression_page(language)
     elif pathname == '/survival-analysis/log-rank':

@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 from sksurv.ensemble import RandomSurvivalForest
 from sksurv.metrics import concordance_index_censored
 from sksurv.util import Surv
+from translations import get_feature_label
 
 
 PROFILE_CATEGORIES = {
@@ -268,6 +269,7 @@ def build_rsf_analysis(df: pd.DataFrame, language: str = 'en'):
     top_feature_value = top_features[0]["importance"] if top_features else 0.0
 
     is_en = language == 'en'
+    top_feature_label = get_feature_label(language, top_feature_name)
 
     survival_labels = ["Low risk", "Medium risk", "High risk"] if is_en else ["Bajo riesgo", "Riesgo medio", "Alto riesgo"]
     if len(representative_indices) < 3:
@@ -301,7 +303,7 @@ def build_rsf_analysis(df: pd.DataFrame, language: str = 'en'):
                 x=curve_times_plot,
                 y=curve_plot,
                 mode="lines+markers",
-                name=f"{survival_labels[index]} (score={risk_scores[row_index]:.3f})",
+                name=f"{survival_labels[index]} ({'score' if is_en else 'puntuación'}={risk_scores[row_index]:.3f})",
                 line=dict(color=colors[index % len(colors)], width=4),
                 line_shape="linear",
                 marker=dict(size=7, color=colors[index % len(colors)]),
@@ -341,7 +343,7 @@ def build_rsf_analysis(df: pd.DataFrame, language: str = 'en'):
         importance_fig = go.Figure(
             go.Bar(
                 x=importance_df["importance"].iloc[::-1],
-                y=importance_df["name"].iloc[::-1],
+                y=importance_df["name"].iloc[::-1].map(lambda name: get_feature_label(language, name)),
                 orientation="h",
                 marker=dict(color="#2980b9"),
                 hovertemplate=(
@@ -391,7 +393,7 @@ def build_rsf_analysis(df: pd.DataFrame, language: str = 'en'):
         },
         {
             "Metrica": "Most influential variable" if is_en else "Variable más influyente",
-            "Valor": top_feature_name,
+            "Valor": top_feature_label,
             "Interpretacion": (f"Approximate relative weight: {top_feature_value:.3f}" if is_en else f"Peso relativo aproximado: {top_feature_value:.3f}"),
         },
     ])
@@ -401,22 +403,22 @@ def build_rsf_analysis(df: pd.DataFrame, language: str = 'en'):
             (
                 f"Random Survival Forest combines {feature_df.shape[1]} variables through trees trained on bootstrap samples. "
                 f"Training concordance is {train_c_index:.3f} and OOB estimate is {oob_score:.3f}. "
-                f"The most influential variable is {top_feature_name}. Curves show how survival changes across low-, medium- and high-risk profiles."
+                f"The most influential variable is {top_feature_label}. Curves show how survival changes across low-, medium- and high-risk profiles."
             ) if is_en else (
                 f"El Random Survival Forest ha combinado {feature_df.shape[1]} variables mediante árboles entrenados sobre muestras bootstrap. "
                 f"La concordancia en entrenamiento es {train_c_index:.3f} y la estimación OOB es {oob_score:.3f}. "
-                f"La variable más influyente es {top_feature_name}. Las curvas muestran cómo cambia la supervivencia para perfiles de bajo, medio y alto riesgo."
+                f"La variable más influyente es {top_feature_label}. Las curvas muestran cómo cambia la supervivencia para perfiles de bajo, medio y alto riesgo."
             )
         )
     else:
         interpretation = (
             (
                 f"Random Survival Forest combines {feature_df.shape[1]} variables through trees trained on bootstrap samples. "
-                f"Training concordance is {train_c_index:.3f}. The most influential variable is {top_feature_name}. "
+                f"Training concordance is {train_c_index:.3f}. The most influential variable is {top_feature_label}. "
                 f"Curves show how survival changes across low-, medium- and high-risk profiles."
             ) if is_en else (
                 f"El Random Survival Forest ha combinado {feature_df.shape[1]} variables mediante árboles entrenados sobre muestras bootstrap. "
-                f"La concordancia en entrenamiento es {train_c_index:.3f}. La variable más influyente es {top_feature_name}. "
+                f"La concordancia en entrenamiento es {train_c_index:.3f}. La variable más influyente es {top_feature_label}. "
                 f"Las curvas muestran cómo cambia la supervivencia para perfiles de bajo, medio y alto riesgo."
             )
         )

@@ -8,7 +8,7 @@ import pandas as pd
 from dash import dcc
 import plotly.graph_objs as go
 from lifelines import KaplanMeierFitter
-from translations import localize_figure
+from translations import get_covariate_label, get_plotly_config, get_translation, localize_figure
 
 # Map the selected interface covariate to the actual columns.
 # age_band and highest_education are one-hot encoded variables.
@@ -33,7 +33,7 @@ def _rgba_with_alpha(color, alpha):
     return color
 
 
-def _add_km_trace_with_ci(fig, kmf, name, color, show_legend=True):
+def _add_km_trace_with_ci(fig, kmf, name, color, show_legend=True, language='en'):
     """Add the Kaplan-Meier curve and its confidence interval to the figure."""
     survival_col = kmf.survival_function_.columns[0]
     timeline = kmf.timeline.tolist()
@@ -49,7 +49,7 @@ def _add_km_trace_with_ci(fig, kmf, name, color, show_legend=True):
         line=dict(color='rgba(0,0,0,0)', width=0),
         hoverinfo='skip',
         showlegend=False,
-        name=f'{name} IC superior'
+        name=f"{name} {'Upper CI' if language == 'en' else 'IC superior'}"
     ))
 
     fig.add_trace(go.Scatter(
@@ -61,7 +61,7 @@ def _add_km_trace_with_ci(fig, kmf, name, color, show_legend=True):
         fillcolor=_rgba_with_alpha(color, 0.18),
         hoverinfo='skip',
         showlegend=False,
-        name=f'{name} IC inferior'
+        name=f"{name} {'Lower CI' if language == 'en' else 'IC inferior'}"
     ))
 
     fig.add_trace(go.Scatter(
@@ -91,17 +91,17 @@ def plot_kaplan_meier(df, language='en'):
     fig = go.Figure()
 
     # Kaplan-Meier curve.
-    _add_km_trace_with_ci(fig, kmf, '', 'rgba(0, 0, 255, 1.0)', show_legend=False)
+    _add_km_trace_with_ci(fig, kmf, '', 'rgba(0, 0, 255, 1.0)', show_legend=False, language=language)
 
     fig.update_layout(
-        title="Curva de Supervivencia Kaplan-Meier",
-        xaxis_title="Tiempo",
-        yaxis_title="Probabilidad de Supervivencia",
+        title=get_translation(language, 'curva_supervivencia'),
+        xaxis_title=get_translation(language, 'tiempo'),
+        yaxis_title=get_translation(language, 'probabilidad_supervivencia'),
         yaxis=dict(range=[0, 1]),
 
     )
 
-    return dcc.Graph(figure=localize_figure(fig, language))
+    return dcc.Graph(figure=fig, config=get_plotly_config(language))
 
 
 def plot_km_G(df, group_by='gender_F', language='en'):
@@ -144,8 +144,8 @@ def plot_km_by_covariate(df, covariable_name='gender_F', language='en'):
     
     # Map labels according to the variable type.
     label_map = {
-        'gender_F': {1: "Femenino", 0: "Masculino"},
-        'disability_N': {1: "Sin discapacidad", 0: "Con discapacidad"},
+        'gender_F': {1: get_translation(language, 'femenino'), 0: get_translation(language, 'masculino')},
+        'disability_N': {1: get_translation(language, 'sin_discapacidad'), 0: get_translation(language, 'con_discapacidad')},
         'studied_credits': {}  # No mapping for the continuous variable.
     }
     label_mapping = label_map.get(covariable_name, {})
@@ -179,7 +179,8 @@ def plot_km_by_covariate(df, covariable_name='gender_F', language='en'):
                     fig,
                     kmf,
                     group_label,
-                    colors[idx % len(colors)]
+                    colors[idx % len(colors)],
+                    language=language
                 )
     
     # Categorical variables with multiple values (age_band, highest_education).
@@ -187,12 +188,7 @@ def plot_km_by_covariate(df, covariable_name='gender_F', language='en'):
         idx = 0
         # Iterate over ALL mapped columns, even if they do not exist.
         for col in columns:
-            if col.startswith('age_band_'):
-                label = col.replace('age_band_', '', 1)
-            elif col.startswith('highest_education_'):
-                label = col.replace('highest_education_', '', 1)
-            else:
-                label = col
+            label = get_covariate_label(language, col)
             
             # Get data if available.
             if col in df.columns:
@@ -210,7 +206,8 @@ def plot_km_by_covariate(df, covariable_name='gender_F', language='en'):
                     fig,
                     kmf,
                     f"{label} (n={len(df_group)})",
-                    colors[idx % len(colors)]
+                    colors[idx % len(colors)],
+                    language=language
                 )
             else:
                 # Show groups without observations as dashed gray lines in the legend.
@@ -218,10 +215,10 @@ def plot_km_by_covariate(df, covariable_name='gender_F', language='en'):
                     x=[],
                     y=[],
                     mode='lines+markers',
-                    name=f"{label} (n=0 - Sin datos)",
+                    name=f"{label} (n=0 - {'No data' if language == 'en' else 'Sin datos'})",
                     line=dict(width=2, dash='dash', color='lightgray'),
                     marker=dict(symbol='x'),
-                    hovertemplate=f"<b>{label}</b><br>Sin observaciones en este grupo<extra></extra>"
+                    hovertemplate=f"<b>{label}</b><br>{'No observations in this group' if language == 'en' else 'Sin observaciones en este grupo'}<extra></extra>"
                 ))
             idx += 1
     
@@ -247,7 +244,7 @@ def plot_km_by_covariate(df, covariable_name='gender_F', language='en'):
                 df_group = df_filtered[df_filtered[groups_col] == group_val]
                 
                 if len(df_group) > 0:
-                    group_label = f"Créditos: {group_val}"
+                    group_label = f"{'Credits' if language == 'en' else 'Créditos'}: {group_val}"
                     
                     kmf.fit(df_group['date'],
                            event_observed=df_group['final_result'],
@@ -257,20 +254,21 @@ def plot_km_by_covariate(df, covariable_name='gender_F', language='en'):
                         fig,
                         kmf,
                         group_label,
-                        colors[idx % len(colors)]
+                        colors[idx % len(colors)],
+                        language=language
                     )
     
     # Configure the chart.
     fig.update_layout(
-        title=f'Curva de Kaplan-Meier para {covariable_name}',
-        xaxis_title='Tiempo',
-        yaxis_title='Probabilidad de Supervivencia',
+        title=f"{'Kaplan-Meier Curve for' if language == 'en' else 'Curva de Kaplan-Meier para'} {get_covariate_label(language, covariable_name)}",
+        xaxis_title=get_translation(language, 'tiempo'),
+        yaxis_title=get_translation(language, 'probabilidad_supervivencia'),
         yaxis=dict(range=[0, 1]),
-        legend_title=covariable_name,
+        legend_title=get_covariate_label(language, covariable_name),
         template='plotly_white',
     )
     
-    return dcc.Graph(figure=localize_figure(fig, language))
+    return dcc.Graph(figure=fig, config=get_plotly_config(language))
 
 
 def plot_km_by_covariate_with_figure(df, covariable_name='gender_F', language='en'):
@@ -284,7 +282,7 @@ def plot_km_by_covariate_with_figure(df, covariable_name='gender_F', language='e
     fig = _create_km_figure(df, covariable_name, language=language)
     
     # Return the graph component AND the JSON figure.
-    return dcc.Graph(figure=localize_figure(fig, language)), fig.to_dict()
+    return dcc.Graph(figure=localize_figure(fig, language), config=get_plotly_config(language)), fig.to_dict()
 
 
 def _create_km_figure(df, covariable_name='gender_F', language='en'):
@@ -315,8 +313,8 @@ def _create_km_figure(df, covariable_name='gender_F', language='en'):
     
     # Map labels according to the variable type.
     label_map = {
-        'gender_F': {1: "Femenino", 0: "Masculino"},
-        'disability_N': {1: "Sin discapacidad", 0: "Con discapacidad"},
+        'gender_F': {1: get_translation(language, 'femenino'), 0: get_translation(language, 'masculino')},
+        'disability_N': {1: get_translation(language, 'sin_discapacidad'), 0: get_translation(language, 'con_discapacidad')},
         'studied_credits': {}  # No mapping for the continuous variable.
     }
     label_mapping = label_map.get(covariable_name, {})
@@ -350,7 +348,8 @@ def _create_km_figure(df, covariable_name='gender_F', language='en'):
                     fig,
                     kmf,
                     group_label,
-                    colors[idx % len(colors)]
+                    colors[idx % len(colors)],
+                    language=language
                 )
     
     # Categorical variables with multiple values (age_band, highest_education).
@@ -362,12 +361,7 @@ def _create_km_figure(df, covariable_name='gender_F', language='en'):
             if col not in df.columns:
                 continue
             
-            if col.startswith('age_band_'):
-                label = col.replace('age_band_', '', 1)
-            elif col.startswith('highest_education_'):
-                label = col.replace('highest_education_', '', 1)
-            else:
-                label = col
+            label = get_covariate_label(language, col)
             
             # Get records where this column equals 1.
             df_group = df[df[col] == 1].copy()
@@ -381,7 +375,8 @@ def _create_km_figure(df, covariable_name='gender_F', language='en'):
                     fig,
                     kmf,
                     label,
-                    colors[idx % len(colors)]
+                    colors[idx % len(colors)],
+                    language=language
                 )
                 idx += 1
     
@@ -401,7 +396,7 @@ def _create_km_figure(df, covariable_name='gender_F', language='en'):
                         df_group = df_filtered[df_filtered[groups_col] == group_val]
                         
                         if len(df_group) > 0:
-                            group_label = f"Créditos: {group_val}"
+                            group_label = f"{'Credits' if language == 'en' else 'Créditos'}: {group_val}"
                             
                             kmf.fit(df_group['date'],
                                    event_observed=df_group['final_result'],
@@ -411,16 +406,17 @@ def _create_km_figure(df, covariable_name='gender_F', language='en'):
                                 fig,
                                 kmf,
                                 group_label,
-                                colors[idx % len(colors)]
+                                colors[idx % len(colors)],
+                                language=language
                             )
     
     # Configure the chart.
     fig.update_layout(
-        title=f'Curva de Kaplan-Meier para {covariable_name}',
-        xaxis_title='Tiempo',
-        yaxis_title='Probabilidad de Supervivencia',
+        title=f"{'Kaplan-Meier Curve for' if language == 'en' else 'Curva de Kaplan-Meier para'} {get_covariate_label(language, covariable_name)}",
+        xaxis_title=get_translation(language, 'tiempo'),
+        yaxis_title=get_translation(language, 'probabilidad_supervivencia'),
         yaxis=dict(range=[0, 1]),
-        legend_title=covariable_name,
+        legend_title=get_covariate_label(language, covariable_name),
         template='plotly_white',
     )
     

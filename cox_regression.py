@@ -248,7 +248,7 @@ def run_cox_regression(df_limpio, covariables):
         return pd.DataFrame(), None
 
 
-def create_forest_plot(summary_data):
+def create_forest_plot(summary_data, language='en'):
     """
     Create a forest plot to visualize Cox regression coefficients.
 
@@ -261,6 +261,9 @@ def create_forest_plot(summary_data):
         go.Figure: Plotly forest plot, or None on error.
     """
     try:
+        from translations import get_feature_label
+
+        is_en = language == 'en'
         if summary_data is None or summary_data.empty:
             print("[FOREST] No data to create a forest plot")
             return None
@@ -283,14 +286,14 @@ def create_forest_plot(summary_data):
             return None
 
         summary_data = summary_data.iloc[::-1].reset_index(drop=True)
-        summary_data['label'] = summary_data['Covariable'].astype(str)
+        summary_data['label'] = summary_data['Covariable'].astype(str).map(lambda value: get_feature_label(language, value))
         summary_data['y_pos'] = list(range(len(summary_data)))
         summary_data['log_hr'] = np.log(summary_data['HR'].clip(lower=1e-10))
         summary_data['err_minus'] = summary_data['HR'] - summary_data['CI_lower']
         summary_data['err_plus'] = summary_data['CI_upper'] - summary_data['HR']
 
         fig = go.Figure()
-        fig.add_vline(x=1, line_dash="dash", line_color="red", annotation_text="No Effect", annotation_position="top")
+        fig.add_vline(x=1, line_dash="dash", line_color="red", annotation_text="No effect" if is_en else "Sin efecto", annotation_position="top")
 
         fig.add_trace(go.Scatter(
             x=summary_data['HR'],
@@ -307,7 +310,7 @@ def create_forest_plot(summary_data):
                 width=0
             ),
             text=[
-                f"HR: {hr:.2f} (IC 95%: {ci_l:.2f}-{ci_u:.2f})"
+                f"HR: {hr:.2f} ({'95% CI' if is_en else 'IC 95%'}: {ci_l:.2f}-{ci_u:.2f})"
                 for hr, ci_l, ci_u in zip(summary_data['HR'], summary_data['CI_lower'], summary_data['CI_upper'])
             ],
             hovertemplate='<b>%{text}</b><extra></extra>',
@@ -315,7 +318,7 @@ def create_forest_plot(summary_data):
         ))
 
         fig.update_layout(
-            title="Forest Plot - Cox Model Coefficients",
+            title="Forest Plot - Cox Model Coefficients" if is_en else "Forest Plot - Coeficientes del Modelo Cox",
             xaxis_title="Hazard Ratio",
             yaxis_title="Variables",
             height=max(420, 120 + len(summary_data) * 55),

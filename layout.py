@@ -12,9 +12,9 @@ from dash.dependencies import Input, Output
 import plotly.express as px
 import base64
 import io
-from kaplan_meier import plot_kaplan_meier, plot_km_G, plot_km_disc 
+from kaplan_meier import plot_kaplan_meier, plot_km_G, plot_km_disc, plot_km_by_covariate_with_figure
 import numpy as np
-from translations import get_translation, get_display_text, get_display_records
+from translations import get_covariate_label, get_plotly_config, get_result_column_label, get_translation, get_display_text, get_display_records
 from pdf_exporter import export_survival_analysis_to_pdf
 
 # Local cache for the global Kaplan-Meier view. Populate only when a page
@@ -108,7 +108,7 @@ def _create_ai_response_box(answer_id, loading_message, language='en'):
                 'display': 'block',
                 'border': '1px solid #ccc',
                 'borderRadius': '8px',
-                'fontSize': '14px',
+                'fontSize': '20px',
                 'padding': '10px',
                 'overflowY': 'auto',
                 'color': '#1a1a1a'
@@ -555,7 +555,7 @@ def create_survival_analysis_page(language='en'):
                 dcc.Link(get_translation(language, technique['label_key']), href=technique['href'], className='home-link'),
             ], className='survival-technique-card', style={'textAlign': 'center', 'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center', 'marginTop': '20px', 'width': '30%', 'minWidth': '220px'})
             for technique in techniques
-        ], className='survival-techniques-grid', style={'textAlign': 'center', 'display': 'flex', 'justifyContent': 'center', 'flexWrap': 'wrap', 'gap': '30px', 'marginTop': '20px', 'paddingBottom': '28px'}),  
+        ], className='survival-techniques-grid', style={'textAlign': 'center', 'display': 'flex', 'justifyContent': 'center', 'flexWrap': 'wrap', 'gap': '30px', 'marginTop': '20px', 'paddingBottom': '28px'}),
 
         html.Div([
             dcc.Link(
@@ -949,7 +949,7 @@ def create_techniques_comparison_page(language='en'):
             'margin': '0 20px 25px 20px'
         }),
         html.Div([
-            dcc.Graph(figure=fig, config={'responsive': True, 'displayModeBar': True})
+            dcc.Graph(figure=fig, config=get_plotly_config(language, responsive=True, displayModeBar=True))
         ], style={
             'backgroundColor': '#f8f9fa',
             'padding': '20px',
@@ -1216,23 +1216,23 @@ def create_rsf_analysis_page(language='en'):
             html.Div([
                 html.Div([
                     html.Label(profile_gender_label, style={'fontWeight': 'bold', 'marginBottom': '6px', 'display': 'block'}),
-                    dcc.Dropdown(id='rsf-profile-gender', options=profile_gender_options, value=1, clearable=False),
+                    dcc.Dropdown(id='rsf-profile-gender', options=profile_gender_options, value=1, clearable=False, persistence=True, persistence_type='memory'),
                 ]),
                 html.Div([
                     html.Label(profile_disability_label, style={'fontWeight': 'bold', 'marginBottom': '6px', 'display': 'block'}),
-                    dcc.Dropdown(id='rsf-profile-disability', options=profile_disability_options, value=1, clearable=False),
+                    dcc.Dropdown(id='rsf-profile-disability', options=profile_disability_options, value=1, clearable=False, persistence=True, persistence_type='memory'),
                 ]),
                 html.Div([
                     html.Label(profile_age_label, style={'fontWeight': 'bold', 'marginBottom': '6px', 'display': 'block'}),
-                    dcc.Dropdown(id='rsf-profile-age-band', options=profile_age_options, value='age_band_0-35', clearable=False),
+                    dcc.Dropdown(id='rsf-profile-age-band', options=profile_age_options, value='age_band_0-35', clearable=False, persistence=True, persistence_type='memory'),
                 ]),
                 html.Div([
                     html.Label(profile_education_label, style={'fontWeight': 'bold', 'marginBottom': '6px', 'display': 'block'}),
-                    dcc.Dropdown(id='rsf-profile-education', options=profile_education_options, value='highest_education_A Level or Equivalent', clearable=False),
+                    dcc.Dropdown(id='rsf-profile-education', options=profile_education_options, value='highest_education_A Level or Equivalent', clearable=False, persistence=True, persistence_type='memory'),
                 ]),
                 html.Div([
                     html.Label(profile_credits_label, style={'fontWeight': 'bold', 'marginBottom': '6px', 'display': 'block'}),
-                    dcc.Dropdown(id='rsf-profile-credits', options=profile_credits_options, value='few', clearable=False),
+                    dcc.Dropdown(id='rsf-profile-credits', options=profile_credits_options, value='few', clearable=False, persistence=True, persistence_type='memory'),
                 ]),
             ], style={
                 'display': 'grid',
@@ -1514,7 +1514,7 @@ def create_covariate_analysis_page(language='en'):
                                 id='covariables-graph',
                                 className='analysis-loading-component',
                                 style={'height': '500px'},
-                                config={'responsive': True, 'displayModeBar': True}
+                                config=get_plotly_config(language, responsive=True, displayModeBar=True)
                             ),
                             html.Div(
                                 'Actualizando visualización de covariables...' if language == 'es' else 'Updating covariate visualization...',
@@ -1559,6 +1559,8 @@ def create_cox_regression_page(language='en'):
         html.Div([
             dcc.Dropdown(
                 id='covariables-dropdown-cox',
+                persistence=True,
+                persistence_type='memory',
                 options=[
                     {'label': get_translation(language, 'genero'), 'value': 'gender_F'},
                     {'label': get_translation(language, 'discapacidad'), 'value': 'disability_N'},
@@ -1611,9 +1613,9 @@ def create_cox_regression_page(language='en'):
     ])
 
 # Create the Kaplan-Meier page with multilingual support.
-def create_kaplan_meier_page(language='en'):
+def create_kaplan_meier_page(language='en', current_variable='', df_json=None):
     """Build the Kaplan-Meier view."""
-    layout_df = _get_layout_df()
+    layout_df = pd.read_json(io.StringIO(df_json), orient='split') if df_json else _get_layout_df()
     km_global_component = (
         plot_kaplan_meier(layout_df, language=language)
         if not layout_df.empty and all(col in layout_df.columns for col in ['date', 'final_result'])
@@ -1622,6 +1624,17 @@ def create_kaplan_meier_page(language='en'):
             style={'textAlign': 'center', 'color': '#b03a2e', 'fontWeight': 'bold', 'padding': '10px'}
         )
     )
+
+    km_cov_component = None
+    if current_variable and not layout_df.empty:
+        graph_component, _ = plot_km_by_covariate_with_figure(layout_df, current_variable, language=language)
+        km_cov_component = html.Div([
+            html.H3(
+                f"{'Kaplan-Meier Curve by' if language == 'en' else 'Curva de Kaplan-Meier por'} {get_covariate_label(language, current_variable)}",
+                style={'textAlign': 'center', 'color': '#0d0d0d', 'fontWeight': 'bold', 'marginBottom': '20px'}
+            ),
+            graph_component,
+        ])
 
     return html.Div([
     html.H1(get_translation(language, 'survival_analysis_prefix').format(name=get_translation(language, 'kaplan_meier')), 
@@ -1668,6 +1681,7 @@ def create_kaplan_meier_page(language='en'):
                 type='circle',
                 children=html.Div(
                     id='km-cov-div',
+                    children=km_cov_component,
                     className='analysis-loading-target',
                     **{'data-loading-message': 'Calculando curva Kaplan-Meier para la covariable seleccionada...' if language == 'es' else 'Computing Kaplan-Meier curve for the selected covariate...'}
                 )
@@ -1688,15 +1702,12 @@ def create_kaplan_meier_page(language='en'):
                              'borderRadius': '8px', 'cursor': 'pointer', 'fontSize': '14px', 'fontWeight': 'bold'}),
         ], style={'textAlign': 'center', 'marginTop': '20px'}),
         
-        # ===== EXPLANATION TEXT AREA =====
+        # ===== TEXTAREA PARA EXPLICACIÓN =====
         _create_ai_response_box(
             'openai-answer-kaplan',
             'Generando interpretación Kaplan-Meier...' if language == 'es' else 'Generating Kaplan-Meier interpretation...',
             language
         ),
-        
-        # Store the current variable.
-        dcc.Store(id='km-current-variable', data=''),
         
         # PDF export modal.
         create_pdf_export_modal('km-pdf-modal', 'kaplan-meier', language)
@@ -1711,6 +1722,8 @@ def create_log_rank_page(language='en'):
         html.Div([
             dcc.Dropdown(
                 id='covariables-dropdown-logrank',
+                persistence=True,
+                persistence_type='memory',
                 options=[
                     {'label': get_translation(language, 'genero'), 'value': 'gender_F'},
                     {'label': get_translation(language, 'discapacidad'), 'value': 'disability_N'},
@@ -1766,20 +1779,22 @@ def create_log_rank_page(language='en'):
 
 def display_logrank_summary_table(result, language='en'):
     """Convert Log-Rank results into a readable Dash table."""
-    df_show = result[['Covariable','Grupo A','Grupo B',
+    from log_rank_test import localize_logrank_results
+
+    df_show = localize_logrank_results(result, language)[['Covariable','Grupo A','Grupo B',
                       'n A','n B','test_statistic','p_value','-log2(p)',
                       'Decisión','Conclusión']].copy()
 
     return dash_table.DataTable(
         id='logrank-summary-table',
-        columns=[{"name": get_display_text(language, col), "id": col} for col in df_show.columns],
+        columns=[{"name": get_result_column_label(language, col), "id": col} for col in df_show.columns],
         data=get_display_records(df_show, language),
         style_table={'height': '150px', 'overflowY': 'auto', 'width': '58%', 'margin': 'auto'},
         style_cell={'textAlign': 'center', 'whiteSpace': 'normal', 'height': 'auto', 'lineHeight': '15px'},
         style_header={'fontWeight': 'bold', 'backgroundColor': '#f4f7f6'},
         style_data_conditional=[
-            {'if': {'filter_query': '{decision} = "Rechazar H0"'}, 'backgroundColor': '#ffecec'},
-            {'if': {'filter_query': '{decision} = "No rechazar H0"'}, 'backgroundColor': '#ecffec'},
+            {'if': {'filter_query': '{Decisión} = "' + ('Reject H0' if language == 'en' else 'Rechazar H0') + '"'}, 'backgroundColor': '#ffecec'},
+            {'if': {'filter_query': '{Decisión} = "' + ('Do not reject H0' if language == 'en' else 'No rechazar H0') + '"'}, 'backgroundColor': '#ecffec'},
         ]
     )
 
